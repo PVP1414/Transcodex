@@ -4,6 +4,7 @@ import upload from '../middleware/upload.middleware.js';
 import { 
   uploadMedia, 
   listMedia, 
+  listPublicMedia,
   getMediaById, 
   deleteMedia, 
   updateMedia,
@@ -16,7 +17,7 @@ router.post('/upload', authenticate, upload.single('file'), uploadMedia);
 
 router.get('/', authenticate, listMedia);
 
-router.get('/public', listMedia);
+router.get('/public', listPublicMedia);
 
 router.get('/:id', authenticate, getMediaById);
 

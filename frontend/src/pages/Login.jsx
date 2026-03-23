@@ -76,6 +76,12 @@ export default function Login() {
             Register
           </Link>
         </p>
+        
+        <div className="mt-6 pt-4 border-t border-gray-200 text-center">
+          <Link to="/public-gallery" className="text-sm text-gray-500 hover:text-indigo-600 transition-colors">
+            Browse public gallery
+          </Link>
+        </div>
       </div>
     </div>
   );

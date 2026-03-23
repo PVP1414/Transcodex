@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import UploadPage from './pages/UploadPage';
 import GalleryPage from './pages/GalleryPage';
+import PublicGalleryPage from './pages/PublicGalleryPage';
 import Docs from './pages/Docs';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/public-gallery" element={<PublicGalleryPage />} />
             
             <Route
               path="/"

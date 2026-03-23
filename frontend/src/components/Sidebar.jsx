@@ -10,6 +10,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     { path: '/docs', label: 'Docs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
   ];
 
+  const externalNavItems = [
+    { path: '/public-gallery', label: 'Public Gallery', icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9', external: false },
+  ];
+
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
@@ -46,6 +50,28 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
           {navItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              onClick={() => setIsOpen(false)}
+              className={`
+                flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200
+                ${isActive(item.path)
+                  ? 'bg-indigo-50 text-indigo-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }
+              `}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+              </svg>
+              {item.label}
+            </Link>
+          ))}
+
+          <div className="my-4 border-t border-gray-200" />
+
+          {externalNavItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}

@@ -189,6 +189,37 @@ export async function listMedia(req, res) {
   }
 }
 
+export async function listPublicMedia(req, res) {
+  try {
+    const { page = 1, limit = 20, type } = req.query;
+    const query = { access: 'public' };
+
+    if (type) query.mediaType = type;
+
+    const media = await Media.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+
+    const total = await Media.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: {
+        media,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 export async function getMediaById(req, res) {
   try {
     const media = await Media.findOne({ _id: req.params.id, user: req.user.id });

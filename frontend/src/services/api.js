@@ -40,6 +40,7 @@ export const mediaService = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   list: (params) => api.get('/media', { params }),
+  listPublic: (params) => api.get('/media/public', { params }),
   getById: (id) => api.get(`/media/${id}`),
   update: (id, data) => api.put(`/media/${id}`, data),
   delete: (id) => api.delete(`/media/${id}`),
