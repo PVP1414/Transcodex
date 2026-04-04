@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Media from '../models/Media.js';
 import { getStorageAdapter } from '../services/storage/index.js';
+import videoTranscoder from '../services/video/Transcoder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,8 +83,42 @@ export async function uploadMedia(req, res) {
       variants,
       access: req.body.access || 'public',
       user: req.user.id,
+      hls: { status: 'pending' }
     });
     console.log('[MEDIA] Created:', media._id);
+
+    if (isVideo) {
+      console.log('[MEDIA] Starting HLS transcoding...');
+      media.hls.status = 'processing';
+      await media.save();
+
+      try {
+        const uploadedFilePath = path.join(__dirname, '../../uploads/', uploadResult.path);
+        console.log('[MEDIA] Transcoding from:', uploadedFilePath);
+        
+        const hlsResult = await videoTranscoder.transcodeToHLS(uploadedFilePath, media._id.toString());
+        console.log('[MEDIA] HLS result:', hlsResult);
+        
+        const thumbnailPath = await videoTranscoder.generateThumbnail(uploadedFilePath, media._id.toString());
+        console.log('[MEDIA] Thumbnail path:', thumbnailPath);
+
+        media.hls = {
+          masterPlaylist: hlsResult.masterPlaylist,
+          qualities: hlsResult.qualities,
+          status: 'completed',
+          thumbnailPath
+        };
+        media.transcodingProgress = 100;
+        await media.save();
+        console.log('[MEDIA] HLS transcoding complete');
+      } catch (transcodeError) {
+        console.error('[MEDIA] HLS transcoding failed:', transcodeError);
+        media.hls.status = 'failed';
+        await media.save();
+      }
+    }
+
+    await fs.unlink(file.path).catch(() => {});
 
     res.status(201).json({ success: true, data: media });
   } catch (error) {

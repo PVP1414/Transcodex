@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import mediaRoutes from './routes/media.routes.js';
+import streamingRoutes from './routes/streaming.routes.js';
 
 dotenv.config();
 
@@ -31,9 +32,11 @@ app.use(morgan('dev'));
 app.use(logger);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/api/streaming', express.static(path.join(__dirname, '../uploads/videos')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/streaming', streamingRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

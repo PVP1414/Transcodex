@@ -1,5 +1,21 @@
 import mongoose from 'mongoose';
 
+const hlsQualitySchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    playlist: {
+      type: String,
+      required: true,
+    },
+    resolution: String,
+    bandwidth: Number,
+  },
+  { _id: false }
+);
+
 const variantSchema = new mongoose.Schema(
   {
     name: {
@@ -63,6 +79,20 @@ const mediaSchema = new mongoose.Schema(
     },
     duration: Number,
     variants: [variantSchema],
+    hls: {
+      masterPlaylist: String,
+      qualities: [hlsQualitySchema],
+      status: {
+        type: String,
+        enum: ['pending', 'processing', 'completed', 'failed'],
+        default: 'pending',
+      },
+      thumbnailPath: String,
+    },
+    transcodingProgress: {
+      type: Number,
+      default: 0,
+    },
     access: {
       type: String,
       enum: ['public', 'private'],
