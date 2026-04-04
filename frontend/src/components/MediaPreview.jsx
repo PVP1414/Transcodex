@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import VideoPlayer from './VideoPlayer';
 
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
@@ -61,10 +62,7 @@ export default function MediaPreview({ media, onClose }) {
           {media.mediaType === 'image' ? (
             <img src={mediaUrl} alt={media.originalName} className="max-w-full max-h-[70vh] object-contain" />
           ) : (
-            <video controls autoPlay className="max-w-full max-h-[70vh]">
-              <source src={mediaUrl} type={media.mimeType} />
-              Your browser does not support video playback.
-            </video>
+            <VideoPlayer media={media} onClose={onClose} />
           )}
         </div>
 

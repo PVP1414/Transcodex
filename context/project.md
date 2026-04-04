@@ -225,11 +225,20 @@ A full-stack media management system built with the MERN stack that enables user
 
 5. **Media Preview**
    - Image lightbox with zoom
-   - Video player
+   - HLS video player with adaptive streaming
+   - Quality selector (360p/480p/720p/1080p)
    - Download functionality
    - ESC key to close
 
-6. **Storage Abstraction**
+6. **Video Streaming (HLS)**
+   - Adaptive bitrate streaming
+   - Multiple quality variants (360p, 480p, 720p, 1080p)
+   - FFmpeg transcoding to HLS format
+   - hls.js player integration
+   - Real-time transcoding status
+   - Authenticated streaming endpoints
+
+7. **Storage Abstraction**
    - Pluggable storage adapters
    - Local filesystem adapter implemented
    - Cloud-ready architecture (S3, Cloudinary ready)
@@ -243,7 +252,6 @@ A full-stack media management system built with the MERN stack that enables user
 - [ ] Search and filtering
 - [ ] Usage analytics
 - [ ] Admin dashboard (user management)
-- [ ] Video streaming with HLS
 - [ ] Image compression settings
 - [ ] Watermark support
 
