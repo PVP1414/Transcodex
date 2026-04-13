@@ -24,12 +24,12 @@ export class VideoTranscoder {
     await fs.mkdir(dirPath, { recursive: true });
   }
 
-  async transcodeToHLS(inputPath, mediaId) {
+  async transcodeToHLS(inputPath, mediaId, onProgress) {
     const outputDir = path.join(this.outputDir, mediaId.toString());
     await this.ensureDir(outputDir);
 
-    const tasks = HLS_QUALITIES.map(quality => 
-      this.transcodeQuality(inputPath, outputDir, quality, mediaId)
+    const tasks = HLS_QUALITIES.map((quality, index) => 
+      this.transcodeQuality(inputPath, outputDir, quality, mediaId, index === HLS_QUALITIES.length - 1 ? onProgress : null)
     );
 
     await Promise.all(tasks);
@@ -45,7 +45,7 @@ export class VideoTranscoder {
     };
   }
 
-  async transcodeQuality(inputPath, outputDir, quality, mediaId) {
+  async transcodeQuality(inputPath, outputDir, quality, mediaId, onProgress) {
     const qualityDir = path.join(outputDir, quality.name);
     await this.ensureDir(qualityDir);
 
@@ -63,6 +63,11 @@ export class VideoTranscoder {
           '-start_number 1'
         ])
         .output(path.join(outputDir, `${quality.name}.m3u8`))
+        .on('progress', (progress) => {
+          if (onProgress && progress.percent) {
+            onProgress(Math.round(progress.percent));
+          }
+        })
         .on('end', () => {
           console.log(`[TRANSCODE] ${quality.name} complete`);
           resolve();

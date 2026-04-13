@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
@@ -9,6 +10,7 @@ export default function VideoPlayer({ media, onClose }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const { token } = useAuth();
+  const toast = useToast();
   const [qualities, setQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
   const [loading, setLoading] = useState(true);
@@ -238,6 +240,19 @@ export default function VideoPlayer({ media, onClose }) {
                 Download
               </a>
             )}
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(fallbackUrl);
+                  toast.success('Public link copied to clipboard!');
+                } catch (err) {
+                  toast.error('Failed to copy link');
+                }
+              }}
+              className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
+            >
+              Share Link
+            </button>
           </div>
         </div>
       </div>

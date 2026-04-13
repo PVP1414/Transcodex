@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { mediaService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import Layout from '../components/Layout';
+import MediaPreview from '../components/MediaPreview';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
 export default function PublicGalleryPage() {
+  const { user } = useAuth();
+  const [selectedMedia, setSelectedMedia] = useState(null);
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
@@ -32,9 +40,10 @@ export default function PublicGalleryPage() {
     fetchMedia(newPage);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+  const content = (
+    <div className={user ? '' : "min-h-screen bg-gray-50"}>
+      {!user && (
+        <header className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -56,6 +65,7 @@ export default function PublicGalleryPage() {
           </div>
         </div>
       </header>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -92,29 +102,42 @@ export default function PublicGalleryPage() {
             </div>
             <p className="text-xl text-gray-600 mb-2">No public media yet</p>
             <p className="text-gray-400">Be the first to share some media!</p>
-            <Link
-              to="/login"
-              className="inline-block mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              Login to Upload
-            </Link>
+            {!user ? (
+              <Link
+                to="/login"
+                className="inline-block mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Login to Upload
+              </Link>
+            ) : (
+              <Link
+                to="/"
+                className="inline-block mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Upload Media
+              </Link>
+            )}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {media.map(item => (
+              {media.map(item => {
+                const hasThumb = !!item.thumbnail?.url;
+                const imgSrc = hasThumb 
+                  ? `${MEDIA_URL}${item.thumbnail.url}` 
+                  : `${API_URL}/media/${item._id}/serve`;
+
+                return (
                 <div
                   key={item._id}
                   className="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer"
+                  onClick={() => setSelectedMedia(item)}
                 >
-                  {item.mediaType === 'image' ? (
+                  {item.mediaType === 'image' || hasThumb ? (
                     <img
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/media/${item._id}/serve`}
+                      src={imgSrc}
                       alt={item.originalName}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        e.target.src = item.thumbnail?.url || '';
-                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-200">
@@ -123,14 +146,21 @@ export default function PublicGalleryPage() {
                       </svg>
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  {item.mediaType === 'video' && (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-black/60 rounded-full flex items-center justify-center z-10 pointer-events-none">
+                      <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6 ml-1">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center z-20">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity text-white text-center p-2">
-                      <p className="text-sm font-medium truncate">{item.originalName}</p>
+                      <p className="text-sm font-medium truncate" title={item.originalName}>{item.originalName}</p>
                       <p className="text-xs opacity-75">{(item.size / 1024 / 1024).toFixed(2)} MB</p>
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
 
             {pagination.pages > 1 && (
@@ -152,9 +182,18 @@ export default function PublicGalleryPage() {
                 </button>
               </div>
             )}
+
+            {selectedMedia && (
+              <MediaPreview 
+                media={selectedMedia} 
+                onClose={() => setSelectedMedia(null)} 
+              />
+            )}
           </>
         )}
       </main>
     </div>
   );
+
+  return user ? <Layout>{content}</Layout> : content;
 }

@@ -1,8 +1,23 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 
-export default function Layout({ children, title }) {
+export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  const getTitle = () => {
+    switch (location.pathname) {
+      case '/': return 'Dashboard';
+      case '/upload': return 'Upload';
+      case '/gallery': return 'Gallery';
+      case '/docs': return 'Documentation';
+      case '/public-gallery': return 'Public Gallery';
+      default: return 'MediaHub';
+    }
+  };
+
+  const title = getTitle();
 
   return (
     <div className="min-h-screen bg-gray-50">

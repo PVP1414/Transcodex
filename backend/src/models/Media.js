@@ -96,7 +96,7 @@ const mediaSchema = new mongoose.Schema(
     access: {
       type: String,
       enum: ['public', 'private'],
-      default: 'public',
+      default: 'private',
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,

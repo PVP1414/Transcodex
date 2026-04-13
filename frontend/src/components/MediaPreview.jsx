@@ -1,9 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import VideoPlayer from './VideoPlayer';
+import { mediaService } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
-export default function MediaPreview({ media, onClose }) {
+export default function MediaPreview({ media: initialMedia, onClose }) {
+  const [media, setMedia] = useState(initialMedia);
+  const toast = useToast();
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
@@ -78,13 +82,28 @@ export default function MediaPreview({ media, onClose }) {
             </span>
           </div>
           
-          <a 
-            href={mediaUrl} 
-            download={media.originalName}
-            className="inline-block px-6 py-2 bg-indigo-500 text-white font-medium rounded-lg hover:bg-indigo-600 transition-colors"
-          >
-            Download
-          </a>
+          <div className="flex gap-3 mt-4">
+            <a 
+              href={mediaUrl} 
+              download={media.originalName}
+              className="inline-block px-6 py-2 bg-indigo-500 text-white font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+            >
+              Download
+            </a>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(mediaUrl);
+                  toast.success('Public link copied to clipboard!');
+                } catch (err) {
+                  toast.error('Failed to copy link');
+                }
+              }}
+              className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
+            >
+              Share Link
+            </button>
+          </div>
         </div>
       </div>
     </div>

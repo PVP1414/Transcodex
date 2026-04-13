@@ -40,17 +40,46 @@ export default function Upload({ onUploadComplete }) {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('access', 'public');
+    formData.append('access', 'private');
+    const isVideo = file.type.startsWith('video');
 
     try {
-      const res = await mediaService.upload(formData);
-      setProgress(100);
-      if (onUploadComplete) {
-        onUploadComplete(res.data.data);
+      const res = await mediaService.upload(formData, (progressEvent) => {
+        let percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        if (percentCompleted === 100) percentCompleted = 99;
+        setProgress(isVideo ? Math.floor(percentCompleted / 2) : percentCompleted);
+      });
+      
+      const uploadedMedia = res.data.data;
+      
+      if (isVideo && uploadedMedia.hls?.status === 'processing') {
+        const intervalId = setInterval(async () => {
+          try {
+            const statusRes = await mediaService.getById(uploadedMedia._id);
+            const statusMedia = statusRes.data.data;
+            if (statusMedia.transcodingProgress > 0) {
+              setProgress(50 + Math.floor(statusMedia.transcodingProgress / 2));
+            }
+            if (statusMedia.hls.status === 'completed' || statusMedia.hls.status === 'failed') {
+               clearInterval(intervalId);
+               setProgress(100);
+               if (onUploadComplete) onUploadComplete(statusMedia);
+               setTimeout(() => setUploading(false), 500);
+            }
+          } catch(err) {
+             clearInterval(intervalId);
+             setUploading(false);
+          }
+        }, 1000);
+      } else {
+        setProgress(100);
+        if (onUploadComplete) {
+          onUploadComplete(uploadedMedia);
+        }
+        setTimeout(() => setUploading(false), 500);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Upload failed');
-    } finally {
       setUploading(false);
     }
   };
@@ -106,7 +135,9 @@ export default function Upload({ onUploadComplete }) {
                 {Math.round(progress)}%
               </span>
             </div>
-            <p className="mt-4 text-gray-600">Uploading...</p>
+            <p className="mt-4 text-gray-600">
+              {progress === 99 ? 'Processing...' : 'Uploading...'}
+            </p>
           </div>
         ) : (
           <>

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Layout from '../components/Layout';
 import MediaGallery from '../components/MediaGallery';
 import MediaPreview from '../components/MediaPreview';
 
@@ -8,7 +7,7 @@ export default function GalleryPage() {
   const [selectedMedia, setSelectedMedia] = useState(null);
 
   return (
-    <Layout title="Gallery">
+    <>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Media Gallery</h2>
         <p className="text-gray-500 mt-1">
@@ -29,6 +28,6 @@ export default function GalleryPage() {
           onClose={() => setSelectedMedia(null)}
         />
       )}
-    </Layout>
+    </>
   );
 }

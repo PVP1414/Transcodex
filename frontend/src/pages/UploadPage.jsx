@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Layout from '../components/Layout';
 import Upload from '../components/Upload';
 import { useToast } from '../context/ToastContext';
 import { mediaService } from '../services/api';
@@ -14,7 +13,7 @@ export default function UploadPage() {
   };
 
   return (
-    <Layout title="Upload">
+    <>
       <div className="max-w-3xl mx-auto">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-800">Upload Media</h2>
@@ -59,6 +58,6 @@ export default function UploadPage() {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

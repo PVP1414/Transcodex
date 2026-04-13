@@ -92,15 +92,28 @@ export async function uploadMedia(req, res) {
       media.hls.status = 'processing';
       await media.save();
 
-      try {
-        const uploadedFilePath = path.join(__dirname, '../../uploads/', uploadResult.path);
-        console.log('[MEDIA] Transcoding from:', uploadedFilePath);
-        
-        const hlsResult = await videoTranscoder.transcodeToHLS(uploadedFilePath, media._id.toString());
+      res.status(201).json({ success: true, data: media });
+
+      (async () => {
+        try {
+          const uploadedFilePath = path.join(__dirname, '../../uploads/', uploadResult.path);
+          console.log('[MEDIA] Transcoding from:', uploadedFilePath);
+          
+          const hlsResult = await videoTranscoder.transcodeToHLS(uploadedFilePath, media._id.toString(), async (percent) => {
+            media.transcodingProgress = percent;
+            await media.save();
+          });
         console.log('[MEDIA] HLS result:', hlsResult);
         
         const thumbnailPath = await videoTranscoder.generateThumbnail(uploadedFilePath, media._id.toString());
         console.log('[MEDIA] Thumbnail path:', thumbnailPath);
+
+        if (thumbnailPath) {
+          media.thumbnail = {
+            path: `videos/${thumbnailPath}`,
+            url: storage.getUrl(`videos/${thumbnailPath}`)
+          };
+        }
 
         media.hls = {
           masterPlaylist: hlsResult.masterPlaylist,
@@ -111,11 +124,15 @@ export async function uploadMedia(req, res) {
         media.transcodingProgress = 100;
         await media.save();
         console.log('[MEDIA] HLS transcoding complete');
-      } catch (transcodeError) {
-        console.error('[MEDIA] HLS transcoding failed:', transcodeError);
-        media.hls.status = 'failed';
-        await media.save();
-      }
+        } catch (transcodeError) {
+          console.error('[MEDIA] HLS transcoding failed:', transcodeError);
+          media.hls.status = 'failed';
+          await media.save();
+        } finally {
+          await fs.unlink(file.path).catch(() => {});
+        }
+      })();
+      return;
     }
 
     await fs.unlink(file.path).catch(() => {});
@@ -282,6 +299,10 @@ export async function deleteMedia(req, res) {
 
     if (media.thumbnail?.path) {
       await storage.delete(media.thumbnail.path);
+    }
+
+    if (media.mediaType === 'video') {
+      await videoTranscoder.deleteHLSFiles(media._id.toString());
     }
 
     for (const variant of media.variants || []) {

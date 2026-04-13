@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import Layout from '../components/Layout';
 
 export default function Docs() {
   const [activeSection, setActiveSection] = useState('overview');
@@ -14,7 +13,7 @@ export default function Docs() {
   ];
 
   return (
-    <Layout title="Documentation">
+    <>
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Navigation */}
         <nav className="lg:w-64 flex-shrink-0">
@@ -49,7 +48,7 @@ export default function Docs() {
           {activeSection === 'media-processing' && <MediaProcessingSection />}
         </div>
       </div>
-    </Layout>
+    </>
   );
 }
 

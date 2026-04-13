@@ -20,38 +20,12 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/public-gallery" element={<PublicGalleryPage />} />
             
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/upload"
-              element={
-                <ProtectedRoute>
-                  <UploadPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/gallery"
-              element={
-                <ProtectedRoute>
-                  <GalleryPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/docs"
-              element={
-                <ProtectedRoute>
-                  <Docs />
-                </ProtectedRoute>
-              }
-            />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/upload" element={<UploadPage />} />
+              <Route path="/gallery" element={<GalleryPage />} />
+              <Route path="/docs" element={<Docs />} />
+            </Route>
             
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

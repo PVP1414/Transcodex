@@ -36,8 +36,9 @@ export const authService = {
 };
 
 export const mediaService = {
-  upload: (formData) => api.post('/media/upload', formData, {
+  upload: (formData, onUploadProgress) => api.post('/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress,
   }),
   list: (params) => api.get('/media', { params }),
   listPublic: (params) => api.get('/media/public', { params }),

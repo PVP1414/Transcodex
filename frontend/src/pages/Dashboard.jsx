@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import Layout from '../components/Layout';
 import Upload from '../components/Upload';
 import MediaGallery from '../components/MediaGallery';
 import MediaPreview from '../components/MediaPreview';
@@ -19,7 +18,7 @@ export default function Dashboard() {
   };
 
   return (
-    <Layout title="Dashboard">
+    <>
       {/* User welcome */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800">
@@ -57,6 +56,6 @@ export default function Dashboard() {
           onClose={() => setSelectedMedia(null)}
         />
       )}
-    </Layout>
+    </>
   );
 }
