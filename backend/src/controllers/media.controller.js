@@ -100,8 +100,7 @@ export async function uploadMedia(req, res) {
           console.log('[MEDIA] Transcoding from:', uploadedFilePath);
           
           const hlsResult = await videoTranscoder.transcodeToHLS(uploadedFilePath, media._id.toString(), async (percent) => {
-            media.transcodingProgress = percent;
-            await media.save();
+            await Media.findByIdAndUpdate(media._id, { transcodingProgress: percent });
           });
         console.log('[MEDIA] HLS result:', hlsResult);
         
