@@ -32,7 +32,6 @@ app.use(morgan('dev'));
 app.use(logger);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-app.use('/api/streaming', express.static(path.join(__dirname, '../uploads/videos')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);

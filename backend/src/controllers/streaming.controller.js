@@ -6,7 +6,7 @@ import Media from '../models/Media.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const HLS_BASE_DIR = path.join(__dirname, '../../../uploads/videos');
+const HLS_BASE_DIR = path.join(__dirname, '../../uploads/videos');
 
 export async function getMasterPlaylist(req, res) {
   try {
@@ -33,11 +33,12 @@ export async function getMasterPlaylist(req, res) {
     const content = await fs.readFile(playlistPath, 'utf-8');
 
     const baseUrl = `/api/streaming/${id}/`;
+    const tokenQuery = req.query.token ? `?token=${req.query.token}` : '';
+    
     const modifiedContent = content
       .split('\n')
       .map(line => {
-        if (line.endsWith('.m3u8')) return baseUrl + line;
-        if (line.endsWith('.ts')) return baseUrl + line;
+        if (line.endsWith('.m3u8') || line.endsWith('.ts')) return baseUrl + line + tokenQuery;
         return line;
       })
       .join('\n');
@@ -77,17 +78,19 @@ export async function getQualityPlaylist(req, res) {
     const content = await fs.readFile(playlistPath, 'utf-8');
 
     const baseUrl = `/api/streaming/${id}/${quality}/`;
+    const tokenQuery = req.query.token ? `?token=${req.query.token}` : '';
+    
     const modifiedContent = content
       .split('\n')
       .map(line => {
-        if (line.endsWith('.ts')) return baseUrl + line.replace('.ts', '');
+        if (line.endsWith('.ts')) return baseUrl + line.replace('.ts', '') + tokenQuery;
         return line;
       })
       .join('\n');
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.send(content);
+    res.send(modifiedContent);
   } catch (error) {
     console.error('[STREAM] Error serving quality playlist:', error);
     res.status(500).json({ success: false, message: error.message });

@@ -43,6 +43,10 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
     return 'N/A';
   };
 
+  if (media.mediaType === 'video') {
+    return <VideoPlayer media={media} onClose={onClose} />;
+  }
+
   return (
     <div 
       className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-8"
@@ -63,11 +67,7 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
         </button>
 
         <div className="flex-1 bg-black flex items-center justify-center min-h-0">
-          {media.mediaType === 'image' ? (
-            <img src={mediaUrl} alt={media.originalName} className="max-w-full max-h-[70vh] object-contain" />
-          ) : (
-            <VideoPlayer media={media} onClose={onClose} />
-          )}
+          <img src={mediaUrl} alt={media.originalName} className="max-w-full max-h-[70vh] object-contain" />
         </div>
 
         <div className="p-6 border-t">
