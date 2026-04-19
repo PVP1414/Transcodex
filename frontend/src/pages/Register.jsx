@@ -27,7 +27,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-indigo-500 to-purple-600">
       <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
         <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">Register</h1>
         
@@ -78,7 +78,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-70"
+            className="w-full py-2 px-4 bg-linear-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-600 hover:to-purple-700 transition-all disabled:opacity-70"
           >
             {loading ? 'Creating account...' : 'Register'}
           </button>

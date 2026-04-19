@@ -10,6 +10,8 @@ export default function MediaCard({ media, onDelete }) {
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
   const [changingAccess, setChangingAccess] = useState(false);
+  const isVideo = media.mediaType === "video";
+  const isImage = media.mediaType === "image";
 
   const thumbnailUrl = media.thumbnail?.url
     ? `${MEDIA_URL}${media.thumbnail.url}`
@@ -23,7 +25,7 @@ export default function MediaCard({ media, onDelete }) {
       await mediaService.delete(media._id);
       toast.success(`"${media.originalName}" deleted`);
       if (onDelete) onDelete(media._id);
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete media");
     } finally {
       setDeleting(false);
@@ -38,7 +40,7 @@ export default function MediaCard({ media, onDelete }) {
       await mediaService.update(media._id, { access: newAccess });
       toast.success(`File is now ${newAccess}`);
       if (onDelete) onDelete(media._id, true);
-    } catch (err) {
+    } catch {
       toast.error("Failed to update access");
     } finally {
       setChangingAccess(false);
@@ -64,21 +66,58 @@ export default function MediaCard({ media, onDelete }) {
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
 
-        {media.mediaType === "video" && (
+        {(isVideo || isImage) && (
           <div className="absolute right-2 bottom-2 bg-black/80 px-2 py-1 rounded text-white text-xs font-semibold backdrop-blur-sm shadow-sm z-10 flex items-center gap-1">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-            Video
+            {isVideo ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-3 h-3"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+            )}
+            {isVideo ? "Video" : "Image"}
           </div>
         )}
 
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <button className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center hover:scale-110 transition-transform">
-            <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6 ml-1">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </button>
+          <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full grid place-items-center text-white hover:scale-110 transition-transform">
+            {isVideo ? (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            ) : (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-6 h-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
+              </svg>
+            )}
+          </div>
         </div>
       </div>
 
