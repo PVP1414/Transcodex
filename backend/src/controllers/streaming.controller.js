@@ -138,6 +138,24 @@ export async function getVideoThumbnail(req, res) {
   }
 }
 
+export async function getScrubSprite(req, res) {
+  try {
+    const { id } = req.params;
+    const media = await Media.findById(id);
+
+    if (!media || !media.hls?.scrubSpritePath) {
+      return res.status(404).json({ success: false, message: 'Scrub sprite not found' });
+    }
+
+    const spritePath = path.join(HLS_BASE_DIR, media.hls.scrubSpritePath);
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.sendFile(spritePath);
+  } catch (error) {
+    res.status(404).json({ success: false, message: 'Scrub sprite not found' });
+  }
+}
+
 export async function getStreamStatus(req, res) {
   try {
     const { id } = req.params;
@@ -147,6 +165,9 @@ export async function getStreamStatus(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
+    const scrubDoc = media.hls?.scrub;
+    const scrubAvailable = !!(media.hls?.scrubSpritePath && scrubDoc?.cols && scrubDoc?.frameCount);
+
     res.json({
       success: true,
       data: {
@@ -154,7 +175,18 @@ export async function getStreamStatus(req, res) {
         status: media.hls?.status || 'pending',
         progress: media.transcodingProgress || 0,
         qualities: media.hls?.qualities?.map(q => q.name) || [],
-        hasHLS: !!media.hls?.masterPlaylist
+        hasHLS: !!media.hls?.masterPlaylist,
+        scrub: scrubAvailable
+          ? {
+              available: true,
+              cols: scrubDoc.cols,
+              rows: scrubDoc.rows,
+              frameCount: scrubDoc.frameCount,
+              cellWidth: scrubDoc.cellWidth,
+              cellHeight: scrubDoc.cellHeight,
+              intervalSec: scrubDoc.intervalSec,
+            }
+          : { available: false },
       }
     });
   } catch (error) {

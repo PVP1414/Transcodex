@@ -16,6 +16,18 @@ const hlsQualitySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const scrubSchema = new mongoose.Schema(
+  {
+    cols: Number,
+    rows: Number,
+    frameCount: Number,
+    cellWidth: Number,
+    cellHeight: Number,
+    intervalSec: Number,
+  },
+  { _id: false }
+);
+
 const variantSchema = new mongoose.Schema(
   {
     name: {
@@ -88,6 +100,8 @@ const mediaSchema = new mongoose.Schema(
         default: 'pending',
       },
       thumbnailPath: String,
+      scrubSpritePath: String,
+      scrub: scrubSchema,
     },
     transcodingProgress: {
       type: Number,

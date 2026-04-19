@@ -5,6 +5,9 @@ export default function Upload({ onUploadComplete }) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadPhase, setUploadPhase] = useState('idle');
+  const [phaseStartTime, setPhaseStartTime] = useState(null);
+  const [phaseProgress, setPhaseProgress] = useState(0);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
@@ -33,10 +36,29 @@ export default function Upload({ onUploadComplete }) {
     }
   };
 
+  const getEtaString = () => {
+    if (!phaseStartTime || phaseProgress === 0 || progress === 100) return '';
+    const elapsed = (Date.now() - phaseStartTime) / 1000;
+    const totalEst = elapsed / (phaseProgress / 100);
+    const remaining = totalEst - elapsed;
+    
+    if (remaining < 0 || !isFinite(remaining)) return 'Calculating...';
+    
+    if (remaining > 60) {
+      const mins = Math.floor(remaining / 60);
+      const secs = Math.floor(remaining % 60);
+      return `~${mins}m ${secs}s left`;
+    }
+    return `~${Math.floor(remaining)}s left`;
+  };
+
   const uploadFile = async (file) => {
     setError('');
     setUploading(true);
     setProgress(0);
+    setUploadPhase('uploading');
+    setPhaseStartTime(Date.now());
+    setPhaseProgress(0);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -47,22 +69,31 @@ export default function Upload({ onUploadComplete }) {
       const res = await mediaService.upload(formData, (progressEvent) => {
         let percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         if (percentCompleted === 100) percentCompleted = 99;
-        setProgress(isVideo ? Math.floor(percentCompleted / 2) : percentCompleted);
+        setProgress(isVideo ? Math.floor(percentCompleted * 0.2) : percentCompleted);
+        setPhaseProgress(percentCompleted);
       });
       
       const uploadedMedia = res.data.data;
       
-      if (isVideo && uploadedMedia.hls?.status === 'processing') {
+      if (uploadedMedia.hls?.status === 'processing' || uploadedMedia.hls?.status === 'pending') {
+        setUploadPhase(isVideo ? 'transcoding' : 'optimizing');
+        setPhaseStartTime(Date.now());
+        setPhaseProgress(0);
+
         const intervalId = setInterval(async () => {
           try {
             const statusRes = await mediaService.getById(uploadedMedia._id);
             const statusMedia = statusRes.data.data;
-            if (statusMedia.transcodingProgress > 0) {
-              setProgress(50 + Math.floor(statusMedia.transcodingProgress / 2));
+            const tProg = statusMedia.transcodingProgress || 0;
+            
+            if (tProg > 0) {
+              setProgress(20 + Math.floor(tProg * 0.8));
+              setPhaseProgress(tProg);
             }
             if (statusMedia.hls.status === 'completed' || statusMedia.hls.status === 'failed') {
                clearInterval(intervalId);
                setProgress(100);
+               setPhaseProgress(100);
                if (onUploadComplete) onUploadComplete(statusMedia);
                setTimeout(() => setUploading(false), 500);
             }
@@ -73,6 +104,7 @@ export default function Upload({ onUploadComplete }) {
         }, 1000);
       } else {
         setProgress(100);
+        setPhaseProgress(100);
         if (onUploadComplete) {
           onUploadComplete(uploadedMedia);
         }
@@ -129,15 +161,21 @@ export default function Upload({ onUploadComplete }) {
                   strokeDasharray={283}
                   strokeDashoffset={283 - (283 * progress) / 100}
                   strokeLinecap="round"
+                  style={{ transition: 'stroke-dashoffset 0.5s ease' }}
                 />
               </svg>
               <span className="absolute inset-0 flex items-center justify-center text-lg font-bold text-indigo-600">
                 {Math.round(progress)}%
               </span>
             </div>
-            <p className="mt-4 text-gray-600">
-              {progress === 99 ? 'Processing...' : 'Uploading...'}
+            <p className="mt-4 text-gray-700 font-medium tracking-wide">
+              {uploadPhase === 'transcoding' ? 'Transcoding media...' : uploadPhase === 'optimizing' ? 'Optimizing image...' : 'Uploading file...'}
             </p>
+            {progress > 0 && progress < 100 && (
+              <p className="mt-1 text-sm text-gray-500 animate-pulse min-h-[20px]">
+                {getEtaString()}
+              </p>
+            )}
           </div>
         ) : (
           <>

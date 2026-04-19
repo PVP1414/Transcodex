@@ -24,7 +24,7 @@ export async function uploadMedia(req, res) {
     const file = req.file;
     console.log('[MEDIA] File received:', file.originalname, file.size, file.mimetype);
 
-    const mimeType = file.mimetype;
+    let mimeType = file.mimetype;
     const isImage = ALLOWED_IMAGE_TYPES.includes(mimeType);
     const isVideo = ALLOWED_VIDEO_TYPES.includes(mimeType);
 
@@ -46,25 +46,6 @@ export async function uploadMedia(req, res) {
     let thumbnail = null;
     let variants = [];
 
-    if (isImage) {
-      console.log('[MEDIA] Getting image metadata...');
-      try {
-        const imageInfo = await sharp(file.path).metadata();
-        console.log('[MEDIA] Image metadata:', imageInfo.width, 'x', imageInfo.height);
-        dimensions = { width: imageInfo.width, height: imageInfo.height };
-
-        console.log('[MEDIA] Creating thumbnail...');
-        thumbnail = await createThumbnail(file.path, file.originalname);
-        console.log('[MEDIA] Thumbnail created');
-
-        console.log('[MEDIA] Creating variants...');
-        variants = await createImageVariants(file.path, file.originalname);
-        console.log('[MEDIA] Variants created:', variants.length);
-      } catch (sharpError) {
-        console.error('[MEDIA] Sharp error:', sharpError);
-      }
-    }
-
     console.log('[MEDIA] Uploading to storage...');
     const uploadResult = await storage.upload(file, { folder });
     console.log('[MEDIA] Uploaded to:', uploadResult.path);
@@ -83,17 +64,49 @@ export async function uploadMedia(req, res) {
       variants,
       access: req.body.access || 'public',
       user: req.user.id,
-      hls: { status: 'pending' }
+      hls: { status: 'processing' } // processing for both image and video
     });
     console.log('[MEDIA] Created:', media._id);
 
+    res.status(201).json({ success: true, data: media });
+
+    if (isImage) {
+      (async () => {
+        try {
+          const uploadedFilePath = path.join(__dirname, '../../uploads/', uploadResult.path);
+          console.log('[MEDIA] Starting async image processing for:', uploadedFilePath);
+          
+          await Media.findByIdAndUpdate(media._id, { transcodingProgress: 25 });
+          
+          const imageInfo = await sharp(uploadedFilePath).metadata();
+          dimensions = { width: imageInfo.width, height: imageInfo.height };
+          await Media.findByIdAndUpdate(media._id, { transcodingProgress: 50 });
+
+          thumbnail = await createThumbnail(uploadedFilePath, file.originalname, media._id.toString());
+          await Media.findByIdAndUpdate(media._id, { transcodingProgress: 75 });
+
+          variants = await createImageVariants(uploadedFilePath, file.originalname, media._id.toString());
+          
+          media.dimensions = dimensions;
+          media.thumbnail = thumbnail;
+          media.variants = variants;
+          media.transcodingProgress = 100;
+          media.hls.status = 'completed';
+          await media.save();
+          console.log('[MEDIA] Async image processing complete');
+        } catch (err) {
+          console.error('[MEDIA] Async image error:', err);
+          media.hls.status = 'failed';
+          await media.save();
+        } finally {
+          await fs.unlink(file.path).catch(() => {});
+        }
+      })();
+      return;
+    }
+
     if (isVideo) {
       console.log('[MEDIA] Starting HLS transcoding...');
-      media.hls.status = 'processing';
-      await media.save();
-
-      res.status(201).json({ success: true, data: media });
-
       (async () => {
         try {
           const uploadedFilePath = path.join(__dirname, '../../uploads/', uploadResult.path);
@@ -104,8 +117,28 @@ export async function uploadMedia(req, res) {
           });
         console.log('[MEDIA] HLS result:', hlsResult);
         
+        const videoMeta = await videoTranscoder.getVideoMetadata(uploadedFilePath);
+        const durationSec = videoMeta?.duration != null ? Number(videoMeta.duration) : null;
+        if (durationSec && Number.isFinite(durationSec)) {
+          media.duration = durationSec;
+        }
+
         const thumbnailPath = await videoTranscoder.generateThumbnail(uploadedFilePath, media._id.toString());
         console.log('[MEDIA] Thumbnail path:', thumbnailPath);
+
+        let scrubSpritePath;
+        let scrub;
+        if (durationSec && Number.isFinite(durationSec) && durationSec > 0) {
+          const scrubResult = await videoTranscoder.generateScrubSprite(
+            uploadedFilePath,
+            media._id.toString(),
+            durationSec
+          );
+          if (scrubResult) {
+            scrubSpritePath = scrubResult.relativePath;
+            scrub = scrubResult.scrub;
+          }
+        }
 
         if (thumbnailPath) {
           media.thumbnail = {
@@ -118,7 +151,9 @@ export async function uploadMedia(req, res) {
           masterPlaylist: hlsResult.masterPlaylist,
           qualities: hlsResult.qualities,
           status: 'completed',
-          thumbnailPath
+          thumbnailPath,
+          scrubSpritePath,
+          scrub,
         };
         media.transcodingProgress = 100;
         await media.save();
@@ -135,8 +170,6 @@ export async function uploadMedia(req, res) {
     }
 
     await fs.unlink(file.path).catch(() => {});
-
-    res.status(201).json({ success: true, data: media });
   } catch (error) {
     console.error('[MEDIA] Error:', error);
     if (req.file?.path) {
@@ -146,11 +179,11 @@ export async function uploadMedia(req, res) {
   }
 }
 
-async function createThumbnail(filePath, originalName) {
+async function createThumbnail(filePath, originalName, mediaId) {
   const ext = path.extname(originalName);
   const name = path.basename(originalName, ext);
   const thumbName = `${name}-thumb.webp`;
-  const thumbPath = path.join(__dirname, `../../uploads/thumbnails/${thumbName}`);
+  const thumbPath = path.join(__dirname, `../../uploads/images/${mediaId}/thumbnails/${thumbName}`);
 
   await fs.mkdir(path.dirname(thumbPath), { recursive: true });
   
@@ -159,13 +192,13 @@ async function createThumbnail(filePath, originalName) {
     .webp({ quality: 80 })
     .toFile(thumbPath);
 
-  const relativePath = `thumbnails/${thumbName}`;
+  const relativePath = `images/${mediaId}/thumbnails/${thumbName}`;
   const storage = getStorageAdapter();
   
   return { path: relativePath, url: storage.getUrl(relativePath) };
 }
 
-async function createImageVariants(filePath, originalName) {
+async function createImageVariants(filePath, originalName, mediaId) {
   const ext = path.extname(originalName);
   const name = path.basename(originalName, ext);
   const variants = [];
@@ -180,7 +213,7 @@ async function createImageVariants(filePath, originalName) {
   for (const variant of sizes) {
     if (originalMeta.width > variant.width) {
       const variantName = `${name}-${variant.name}.webp`;
-      const variantPath = path.join(__dirname, `../../uploads/variants/${variantName}`);
+      const variantPath = path.join(__dirname, `../../uploads/images/${mediaId}/variants/${variantName}`);
 
       await fs.mkdir(path.dirname(variantPath), { recursive: true });
 
@@ -190,7 +223,7 @@ async function createImageVariants(filePath, originalName) {
         .toFile(variantPath);
 
       const meta = await sharp(variantPath).metadata();
-      const relativePath = `variants/${variantName}`;
+      const relativePath = `images/${mediaId}/variants/${variantName}`;
       const storage = getStorageAdapter();
 
       variants.push({

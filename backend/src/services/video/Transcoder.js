@@ -1,8 +1,14 @@
 import ffmpeg from 'fluent-ffmpeg';
 import path from 'path';
 import fs from 'fs/promises';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { getStorageAdapter } from '../storage/index.js';
+
+const SCRUB_CELL_W = 160;
+const SCRUB_CELL_H = 90;
+const SCRUB_MIN_FRAMES = 8;
+const SCRUB_MAX_FRAMES = 80;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -133,6 +139,75 @@ export class VideoTranscoder {
         });
       });
     });
+  }
+
+  /**
+   * Builds a tiled JPEG sprite for timeline scrub previews (two-pass: extract frames, then tile).
+   * @returns {{ relativePath: string, scrub: object } | null}
+   */
+  async generateScrubSprite(inputPath, mediaId, durationSec) {
+    const duration = Number(durationSec);
+    if (!duration || duration <= 0 || !Number.isFinite(duration)) {
+      console.warn('[TRANSCODE] Scrub skipped: invalid duration');
+      return null;
+    }
+
+    let n = Math.min(SCRUB_MAX_FRAMES, Math.max(SCRUB_MIN_FRAMES, Math.round(duration / 4)));
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    const totalFrames = cols * rows;
+    const intervalSec = duration / totalFrames;
+
+    const thumbnailDir = path.join(this.outputDir, mediaId.toString(), 'thumbnails');
+    await this.ensureDir(thumbnailDir);
+    const scrubPath = path.join(thumbnailDir, 'scrub.jpg');
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), `awt-scrub-${mediaId}-`));
+
+    const scalePad = `scale=${SCRUB_CELL_W}:${SCRUB_CELL_H}:force_original_aspect_ratio=decrease,pad=${SCRUB_CELL_W}:${SCRUB_CELL_H}:(ow-iw)/2:(oh-ih)/2`;
+    const fpsExpr = `fps=1/${intervalSec}`;
+    const vfExtract = `${fpsExpr},${scalePad}`;
+    const cellPattern = path.join(tmpDir, 'cell_%04d.jpg');
+
+    try {
+      await new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+          .outputOptions(['-vf', vfExtract, '-an', '-frames:v', String(totalFrames)])
+          .output(cellPattern)
+          .on('end', () => resolve())
+          .on('error', (err) => reject(err))
+          .run();
+      });
+
+      await new Promise((resolve, reject) => {
+        ffmpeg()
+          .input(cellPattern)
+          .inputOptions(['-start_number', '1'])
+          .outputOptions(['-vf', `tile=${cols}x${rows}`, '-frames:v', '1', '-q:v', '3'])
+          .output(scrubPath)
+          .on('end', () => resolve())
+          .on('error', (err) => reject(err))
+          .run();
+      });
+
+      console.log('[TRANSCODE] Scrub sprite generated:', totalFrames, 'cells', cols, 'x', rows);
+      return {
+        relativePath: `${mediaId}/thumbnails/scrub.jpg`,
+        scrub: {
+          cols,
+          rows,
+          frameCount: totalFrames,
+          cellWidth: SCRUB_CELL_W,
+          cellHeight: SCRUB_CELL_H,
+          intervalSec,
+        },
+      };
+    } catch (err) {
+      console.error('[TRANSCODE] Scrub sprite failed:', err.message);
+      await fs.unlink(scrubPath).catch(() => {});
+      return null;
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   async deleteHLSFiles(mediaId) {

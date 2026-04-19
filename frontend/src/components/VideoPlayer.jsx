@@ -1,28 +1,29 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
-import { useToast } from '../context/ToastContext';
 import api from '../services/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
-export default function VideoPlayer({ media, onClose }) {
+export default function VideoPlayer({ media, onClose, directPlayback = false }) {
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const token = localStorage.getItem('token');
-  const toast = useToast();
+  const navigate = useNavigate();
   
   const [qualities, setQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [streamStatus, setStreamStatus] = useState(null);
-  const [useFallback, setUseFallback] = useState(false);
+  const [useFallback, setUseFallback] = useState(!!directPlayback);
 
   // Player State
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [bufferedRanges, setBufferedRanges] = useState([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -30,11 +31,45 @@ export default function VideoPlayer({ media, onClose }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [scrubPreviewTime, setScrubPreviewTime] = useState(0);
+  const [scrubTooltipVisible, setScrubTooltipVisible] = useState(false);
 
   const fallbackUrl = media.url.startsWith('http') ? media.url : `${MEDIA_URL}${media.url}`;
   const controlsTimeoutRef = useRef(null);
+  const scrubSeekingRef = useRef(false);
+
+  const scrubInfo = useMemo(() => {
+    const s = streamStatus?.scrub;
+    if (!s?.available) return null;
+    return s;
+  }, [streamStatus]);
+
+  const scrubImageUrl = useMemo(() => {
+    if (!scrubInfo) return null;
+    const q = token ? `?token=${token}` : '';
+    return `${API_URL}/streaming/${media._id}/scrub.jpg${q}`;
+  }, [scrubInfo, media._id, token]);
 
   useEffect(() => {
+    if (!scrubImageUrl) return;
+    const img = new Image();
+    img.src = scrubImageUrl;
+  }, [scrubImageUrl]);
+
+  useEffect(() => {
+    const endSeek = () => {
+      scrubSeekingRef.current = false;
+    };
+    window.addEventListener('pointerup', endSeek);
+    window.addEventListener('pointercancel', endSeek);
+    return () => {
+      window.removeEventListener('pointerup', endSeek);
+      window.removeEventListener('pointercancel', endSeek);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (directPlayback) return;
     const fetchStreamStatus = async () => {
       try {
         const res = await api.get(`/streaming/${media._id}/status`);
@@ -50,11 +85,16 @@ export default function VideoPlayer({ media, onClose }) {
       }
     };
     fetchStreamStatus();
-  }, [media._id]);
+  }, [media._id, directPlayback]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    if (directPlayback) {
+      setLoading(false);
+      return;
+    }
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -108,7 +148,7 @@ export default function VideoPlayer({ media, onClose }) {
         hlsRef.current.destroy();
       }
     };
-  }, [media._id, token]);
+  }, [media._id, token, directPlayback]);
 
   // Video Event Listeners
   useEffect(() => {
@@ -118,6 +158,16 @@ export default function VideoPlayer({ media, onClose }) {
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
       setProgress((video.currentTime / video.duration) * 100 || 0);
+
+      const ranges = [];
+      if (video.buffered && video.duration > 0) {
+        for (let i = 0; i < video.buffered.length; i++) {
+          const start = (video.buffered.start(i) / video.duration) * 100;
+          const end = (video.buffered.end(i) / video.duration) * 100;
+          ranges.push({ start, width: end - start });
+        }
+      }
+      setBufferedRanges(ranges);
     };
 
     const handleLoadedMetadata = () => setDuration(video.duration);
@@ -224,12 +274,70 @@ export default function VideoPlayer({ media, onClose }) {
     }
   };
 
-  const handleSeek = (e) => {
-    const newTime = (parseFloat(e.target.value) / 100) * duration;
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
+  const handleSeekInput = (e) => {
+    const v = parseFloat(e.target.value);
+    if (duration > 0) {
+      setProgress(v);
+      const newTime = (v / 100) * duration;
+      if (videoRef.current) {
+        videoRef.current.currentTime = newTime;
+      }
+      if (scrubInfo) {
+        setScrubPreviewTime(newTime);
+        setScrubTooltipVisible(true);
+      }
     }
   };
+
+  const handleRangePointerDown = () => {
+    scrubSeekingRef.current = true;
+    if (scrubInfo && duration > 0) {
+      setScrubTooltipVisible(true);
+    }
+  };
+
+  const handleRangeMouseMove = (e) => {
+    if (!scrubInfo || duration <= 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    setScrubPreviewTime(ratio * duration);
+    setScrubTooltipVisible(true);
+  };
+
+  const handleRangeMouseLeave = () => {
+    if (!scrubSeekingRef.current) {
+      setScrubTooltipVisible(false);
+    }
+  };
+
+  const handleRangeTouchMove = (e) => {
+    if (!scrubInfo || duration <= 0) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+    setScrubPreviewTime(ratio * duration);
+    setScrubTooltipVisible(true);
+  };
+
+  const scrubCellStyle = useCallback(
+    (t) => {
+      if (!scrubInfo || !scrubImageUrl || !duration) return {};
+      const { cols, rows, frameCount, cellWidth, cellHeight, intervalSec } = scrubInfo;
+      let idx = Math.floor(t / intervalSec);
+      idx = Math.max(0, Math.min(frameCount - 1, idx));
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      return {
+        width: cellWidth,
+        height: cellHeight,
+        backgroundImage: `url(${scrubImageUrl})`,
+        backgroundSize: `${cols * cellWidth}px ${rows * cellHeight}px`,
+        backgroundPosition: `${-col * cellWidth}px ${-row * cellHeight}px`,
+      };
+    },
+    [scrubInfo, scrubImageUrl, duration]
+  );
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -299,7 +407,7 @@ export default function VideoPlayer({ media, onClose }) {
         >
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-              <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           )}
 
@@ -329,18 +437,18 @@ export default function VideoPlayer({ media, onClose }) {
               <div className="py-1 max-h-48 overflow-y-auto">
                 <button 
                   onClick={() => handleQualityChange(-1)} 
-                  className={`w-full text-left px-3 py-2 hover:bg-white/10 transition-colors flex items-center gap-2 ${currentQuality === -1 ? 'text-indigo-400' : ''}`}
+                  className={`w-full text-left px-3 py-2 hover:bg-white/10 transition-colors flex items-center gap-2 ${currentQuality === -1 ? 'text-blue-400' : ''}`}
                 >
-                  {currentQuality === -1 && <span className="w-2 h-2 rounded-full bg-indigo-500"></span>}
+                  {currentQuality === -1 && <span className="w-2 h-2 rounded-full bg-blue-500"></span>}
                   <span className={currentQuality === -1 ? 'pl-0' : 'pl-4'}>Auto</span>
                 </button>
                 {qualities.map((q, idx) => (
                   <button 
                     key={idx} 
                     onClick={() => handleQualityChange(idx)} 
-                    className={`w-full text-left px-3 py-2 hover:bg-white/10 transition-colors flex items-center gap-2 ${currentQuality === idx ? 'text-indigo-400' : ''}`}
+                    className={`w-full text-left px-3 py-2 hover:bg-white/10 transition-colors flex items-center gap-2 ${currentQuality === idx ? 'text-blue-400' : ''}`}
                   >
-                    {currentQuality === idx && <span className="w-2 h-2 rounded-full bg-indigo-500"></span>}
+                    {currentQuality === idx && <span className="w-2 h-2 rounded-full bg-blue-500"></span>}
                     <span className={currentQuality === idx ? 'pl-0' : 'pl-4'}>{q}</span>
                   </button>
                 ))}
@@ -349,29 +457,59 @@ export default function VideoPlayer({ media, onClose }) {
           )}
 
           {/* Custom Controls Bar */}
-          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col pt-12 pb-2 px-4 transition-opacity duration-300 z-10 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col pb-2 px-4 transition-opacity duration-300 z-10 ${scrubInfo ? 'pt-24 sm:pt-28' : 'pt-12'} ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
             
             {/* Timeline Slider */}
-            <div className="w-full relative h-1 sm:h-1.5 bg-gray-600/50 rounded-full mb-3 group/slider cursor-pointer">
-              {/* Progress fill */}
-              <div className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full group-hover/slider:bg-indigo-400 transition-colors" style={{ width: `${progress}%` }}></div>
-              {/* Thumb */}
-              <div className="absolute top-1/2 -mt-1.5 sm:-mt-2 w-3 h-3 sm:w-4 sm:h-4 bg-indigo-500 rounded-full opacity-0 group-hover/slider:opacity-100 transition-opacity shadow" style={{ left: `calc(${progress}% - 8px)` }}></div>
-              <input 
-                type="range" 
-                min="0" 
-                max="100" 
-                value={progress || 0} 
-                onChange={handleSeek} 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-none" 
-              />
+            <div className="w-full relative mb-3 group/slider cursor-pointer pt-1">
+              {scrubInfo && scrubTooltipVisible && duration > 0 && (
+                <div
+                  className="absolute pointer-events-none z-[4] flex flex-col items-center gap-1"
+                  style={{
+                    left: `${(scrubPreviewTime / duration) * 100}%`,
+                    bottom: 'calc(100% + 10px)',
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <div
+                    className="rounded border border-white/25 shadow-lg overflow-hidden bg-black shrink-0"
+                    style={scrubCellStyle(scrubPreviewTime)}
+                  />
+                  <span className="text-[10px] sm:text-xs text-white tabular-nums bg-black/85 px-1.5 py-0.5 rounded">
+                    {formatTime(scrubPreviewTime)}
+                  </span>
+                </div>
+              )}
+              <div className="relative h-1 sm:h-1.5 bg-gray-600/50 rounded-full">
+                {/* Buffered fill (chunks loaded) */}
+                {bufferedRanges.map((range, idx) => (
+                  <div key={`buf-${idx}`} className="absolute top-0 h-full bg-gray-400/60 rounded-full transition-all duration-300 pointer-events-none" style={{ left: `${range.start}%`, width: `${range.width}%` }}></div>
+                ))}
+                {/* Progress fill */}
+                <div className="absolute top-0 left-0 h-full bg-blue-500 rounded-full group-hover/slider:bg-blue-400 transition-colors pointer-events-none" style={{ width: `${progress}%`, zIndex: 1 }}></div>
+                {/* Thumb */}
+                <div className="absolute top-1/2 -mt-1.5 sm:-mt-2 w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded-full opacity-0 group-hover/slider:opacity-100 transition-opacity shadow pointer-events-none" style={{ left: `calc(${progress}% - 8px)`, zIndex: 2 }}></div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="100" 
+                  value={progress || 0} 
+                  onInput={handleSeekInput}
+                  onChange={handleSeekInput}
+                  onPointerDown={handleRangePointerDown}
+                  onMouseMove={handleRangeMouseMove}
+                  onMouseLeave={handleRangeMouseLeave}
+                  onTouchMove={handleRangeTouchMove}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-none" 
+                  style={{ zIndex: 3 }}
+                />
+              </div>
             </div>
 
             {/* Bottom Controls */}
             <div className="flex items-center justify-between text-white">
               
               <div className="flex items-center gap-3 sm:gap-6">
-                <button onClick={togglePlay} className="hover:text-indigo-400 transition-colors focus:outline-none">
+                <button onClick={togglePlay} className="hover:text-blue-400 transition-colors focus:outline-none">
                   {isPlaying ? (
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 sm:w-8 sm:h-8"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                   ) : (
@@ -381,7 +519,7 @@ export default function VideoPlayer({ media, onClose }) {
                 
                 {/* Volume Control */}
                 <div className="flex items-center gap-2 group/volume">
-                  <button onClick={toggleMute} className="hover:text-indigo-400 transition-colors focus:outline-none">
+                  <button onClick={toggleMute} className="hover:text-blue-400 transition-colors focus:outline-none">
                     {isMuted || volume === 0 ? (
                       <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 sm:w-6 sm:h-6"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
                     ) : volume < 0.5 ? (
@@ -410,7 +548,7 @@ export default function VideoPlayer({ media, onClose }) {
                 {!useFallback && qualities.length > 0 && (
                   <button 
                     onClick={() => setShowSettings(!showSettings)} 
-                    className={`hover:text-indigo-400 transition-colors focus:outline-none flex items-center gap-1 ${showSettings ? 'text-indigo-400' : ''}`}
+                    className={`hover:text-blue-400 transition-colors focus:outline-none flex items-center gap-1 ${showSettings ? 'text-blue-400' : ''}`}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                     <span className="text-xs hidden sm:inline-block border border-gray-500 rounded px-1 min-w-[32px] text-center">
@@ -420,7 +558,7 @@ export default function VideoPlayer({ media, onClose }) {
                 )}
 
                 {/* Fullscreen Toggle */}
-                <button onClick={toggleFullscreen} className="hover:text-indigo-400 transition-colors focus:outline-none">
+                <button onClick={toggleFullscreen} className="hover:text-blue-400 transition-colors focus:outline-none">
                   {isFullscreen ? (
                     <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 sm:w-6 sm:h-6"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
                   ) : (
@@ -439,15 +577,11 @@ export default function VideoPlayer({ media, onClose }) {
               {media.originalName}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(fallbackUrl);
-                      toast.success('Public link copied to clipboard!');
-                    } catch (err) {
-                      toast.error('Failed to copy link');
-                    }
+                  type="button"
+                  onClick={() => {
+                    navigate(`/watch?src=${encodeURIComponent(fallbackUrl)}`);
                   }}
-                  className="p-2 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-600 font-semibold rounded-lg hover:bg-indigo-100 transition-colors text-sm flex items-center gap-2"
+                  className="p-2 sm:px-4 sm:py-2 bg-blue-50 text-blue-600 font-semibold rounded-lg hover:bg-blue-100 transition-colors text-sm flex items-center gap-2"
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                   <span className="hidden sm:inline">Share</span>
@@ -479,7 +613,7 @@ export default function VideoPlayer({ media, onClose }) {
                 {streamStatus.qualities?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {streamStatus.qualities.map((q, idx) => (
-                      <span key={idx} className="bg-indigo-50 border border-indigo-100 text-indigo-600 px-2.5 py-0.5 rounded-full text-xs font-medium">
+                      <span key={idx} className="bg-blue-50 border border-blue-100 text-blue-600 px-2.5 py-0.5 rounded-full text-xs font-medium">
                         {q}
                       </span>
                     ))}

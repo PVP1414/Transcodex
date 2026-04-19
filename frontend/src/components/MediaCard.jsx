@@ -51,66 +51,78 @@ export default function MediaCard({ media, onDelete, onClick }) {
 
   return (
     <div 
-      className={`bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer hover:-translate-y-1 ${deleting ? 'opacity-50 pointer-events-none' : ''}`}
+      className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group flex flex-col ${deleting ? 'opacity-50 pointer-events-none' : ''}`}
       onClick={() => onClick?.(media)}
     >
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
+      <div className="relative aspect-video bg-gray-900 overflow-hidden group-hover:rounded-none transition-all">
         <img 
           src={thumbnailUrl} 
           alt={media.originalName} 
           loading="lazy"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         
         {media.mediaType === 'video' && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-black/60 rounded-full flex items-center justify-center z-10">
-            <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6 ml-1">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+          <div className="absolute right-2 bottom-2 bg-black/80 px-2 py-1 rounded text-white text-xs font-semibold backdrop-blur-sm shadow-sm z-10 flex items-center gap-1">
+             <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+               <path d="M8 5v14l11-7z" />
+             </svg>
+             Video
           </div>
         )}
         
-        <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-          <button className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-110 transition-transform">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <button className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center hover:scale-110 transition-transform">
+            <svg viewBox="0 0 24 24" fill="white" className="w-6 h-6 ml-1">
+              <path d="M8 5v14l11-7z" />
             </svg>
           </button>
         </div>
       </div>
 
-      <div className="p-4">
-        <p className="font-medium truncate mb-2" title={media.originalName}>
+      <div className="p-3 flex flex-col flex-grow">
+        <h3 className="font-semibold text-gray-900 line-clamp-2 leading-tight mb-1" title={media.originalName}>
           {media.originalName}
-        </p>
+        </h3>
         
-        <div className="flex gap-2 text-xs text-gray-500 mb-3">
-          <span className="bg-gray-100 px-2 py-1 rounded capitalize">{media.mediaType}</span>
-          <span className="px-2 py-1">{formatSize(media.size)}</span>
+        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 mt-auto pt-2">
+          <span>{formatSize(media.size)}</span>
+          <span className="w-1 h-1 rounded-full bg-gray-400"></span>
+          <span className="capitalize">{media.access}</span>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={toggleAccess}
             disabled={changingAccess}
             title={media.access === 'public' ? 'Make private' : 'Make public'}
-            className={`flex-1 py-2 px-3 rounded-lg border transition-colors ${
+            className={`flex-1 py-1.5 px-2 rounded-md text-xs font-medium border flex justify-center items-center gap-1 transition-colors ${
               media.access === 'public' 
-                ? 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100' 
-                : 'border-yellow-200 bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
+                ? 'border-indigo-100 bg-indigo-50 text-indigo-600 hover:bg-indigo-100' 
+                : 'border-yellow-100 bg-yellow-50 text-yellow-600 hover:bg-yellow-100'
             }`}
           >
-            {changingAccess ? '...' : media.access === 'public' ? '🌐' : '🔒'}
+            {changingAccess ? (
+              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+            ) : media.access === 'public' ? (
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            ) : (
+               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            )}
+            {media.access === 'public' ? 'Public' : 'Private'}
           </button>
           
           <button
             onClick={handleDelete}
             disabled={deleting}
             title="Delete"
-            className="flex-1 py-2 px-3 border border-red-200 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+            className="flex-none w-8 py-1.5 rounded-md border border-red-100 bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-600 justify-center items-center flex transition-colors"
           >
-            {deleting ? '...' : '🗑️'}
+            {deleting ? (
+              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            )}
           </button>
         </div>
       </div>

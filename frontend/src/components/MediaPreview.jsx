@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import VideoPlayer from './VideoPlayer';
-import { mediaService } from '../services/api';
-import { useToast } from '../context/ToastContext';
 
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
 export default function MediaPreview({ media: initialMedia, onClose }) {
   const [media, setMedia] = useState(initialMedia);
-  const toast = useToast();
+  const [currentQuality, setCurrentQuality] = useState('original');
+  const navigate = useNavigate();
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
@@ -24,6 +24,17 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
   const mediaUrl = media.url.startsWith('http') 
     ? media.url 
     : `${MEDIA_URL}${media.url}`;
+
+  const getDisplayUrl = () => {
+    if (currentQuality === 'original') return mediaUrl;
+    if (media.variants) {
+      const variant = media.variants.find(v => v.name === currentQuality);
+      if (variant) {
+        return variant.url.startsWith('http') ? variant.url : `${MEDIA_URL}${variant.url}`;
+      }
+    }
+    return mediaUrl;
+  };
 
   const formatSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
@@ -66,8 +77,8 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
           </svg>
         </button>
 
-        <div className="flex-1 bg-black flex items-center justify-center min-h-0">
-          <img src={mediaUrl} alt={media.originalName} className="max-w-full max-h-[70vh] object-contain" />
+        <div className="flex-1 bg-black flex items-center justify-center min-h-0 relative">
+          <img src={getDisplayUrl()} alt={media.originalName} className="max-w-full max-h-[70vh] object-contain transition-opacity duration-300" />
         </div>
 
         <div className="p-6 border-t">
@@ -81,6 +92,29 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
               {media.access === 'public' ? '🌐 Public' : '🔒 Private'}
             </span>
           </div>
+
+          {media.mediaType === 'image' && media.variants?.length > 0 && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm font-semibold text-gray-700">Quality:</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setCurrentQuality('original')}
+                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${currentQuality === 'original' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                >
+                  Original
+                </button>
+                {media.variants.map(v => (
+                  <button
+                    key={v.name}
+                    onClick={() => setCurrentQuality(v.name)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors capitalize ${currentQuality === v.name ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  >
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="flex gap-3 mt-4">
             <a 
@@ -91,17 +125,13 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
               Download
             </a>
             <button
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(mediaUrl);
-                  toast.success('Public link copied to clipboard!');
-                } catch (err) {
-                  toast.error('Failed to copy link');
-                }
+              type="button"
+              onClick={() => {
+                navigate(`/image?src=${encodeURIComponent(getDisplayUrl())}`);
               }}
               className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
             >
-              Share Link
+              Share link
             </button>
           </div>
         </div>

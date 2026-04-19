@@ -5,6 +5,7 @@ import {
   getQualityPlaylist,
   getSegment,
   getVideoThumbnail,
+  getScrubSprite,
   getStreamStatus,
   getAvailableQualities
 } from '../controllers/streaming.controller.js';
@@ -18,6 +19,8 @@ router.get('/:id/:quality.m3u8', authenticate, getQualityPlaylist);
 router.get('/:id/:quality/:segment', authenticate, getSegment);
 
 router.get('/:id/thumbnail', getVideoThumbnail);
+
+router.get('/:id/scrub.jpg', getScrubSprite);
 
 router.get('/:id/status', authenticate, getStreamStatus);
 
