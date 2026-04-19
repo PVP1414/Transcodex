@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VideoPlayer from './VideoPlayer';
 import { mediaService } from '../services/api';
-
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
+import { getSharePath } from '../utils/share';
 
 export default function MediaPreview({ media: initialMedia, onClose }) {
-  const [media, setMedia] = useState(initialMedia);
+  const [media] = useState(initialMedia);
   const [currentQuality, setCurrentQuality] = useState('original');
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const canShare = media?.access === 'public';
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
@@ -23,19 +23,11 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
     };
   }, [onClose]);
 
-  const mediaUrl = media.url.startsWith('http') 
-    ? media.url 
-    : `${MEDIA_URL}${media.url}`;
-
   const getDisplayUrl = () => {
-    if (currentQuality === 'original') return mediaUrl;
-    if (media.variants) {
-      const variant = media.variants.find(v => v.name === currentQuality);
-      if (variant) {
-        return variant.url.startsWith('http') ? variant.url : `${MEDIA_URL}${variant.url}`;
-      }
-    }
-    return mediaUrl;
+    return mediaService.serve(String(media._id), {
+      variant: currentQuality === 'original' ? undefined : currentQuality,
+      token: token || undefined,
+    });
   };
 
   const formatSize = (bytes) => {
@@ -127,15 +119,21 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
             >
               Download
             </a>
-            <button
-              type="button"
-              onClick={() => {
-                navigate(`/image?id=${encodeURIComponent(String(media._id))}`);
-              }}
-              className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
-            >
-              Share link
-            </button>
+            {canShare ? (
+              <button
+                type="button"
+                onClick={() => {
+                  navigate(getSharePath(media._id));
+                }}
+                className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
+              >
+                Share link
+              </button>
+            ) : (
+              <span className="inline-block px-6 py-2 bg-gray-200 text-gray-500 font-medium rounded-lg">
+                Make public to share
+              </span>
+            )}
           </div>
         </div>
       </div>

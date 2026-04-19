@@ -275,7 +275,7 @@ function APISection() {
           <p className="text-gray-500 text-xs mb-2">Form Fields:</p>
           <ul className="text-sm text-gray-600 space-y-1 ml-4">
             <li><code className="bg-gray-100 px-1 rounded">file</code> - The media file (required)</li>
-            <li><code className="bg-gray-100 px-1 rounded">access</code> - "public" or "private" (optional, default: "public")</li>
+            <li><code className="bg-gray-100 px-1 rounded">access</code> - "public" or "private" (optional, default: "private")</li>
           </ul>
         </div>
 
@@ -415,7 +415,7 @@ function MediaProcessingSection() {
           <div className="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">1</div>
           <div>
             <h4 className="font-semibold text-gray-800">Original Upload</h4>
-            <p className="text-sm text-gray-600">Original file is stored in /uploads/images/ or /uploads/videos/</p>
+            <p className="text-sm text-gray-600">Original files are stored on disk and delivered through protected media endpoints.</p>
           </div>
         </div>
 

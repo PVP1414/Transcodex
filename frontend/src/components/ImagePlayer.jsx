@@ -1,31 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { mediaService } from "../services/api";
+import { getSharePath } from "../utils/share";
 
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || "http://localhost:5000";
-
-export default function ImagePlayer({ media, onClose }) {
+export default function ImagePlayer({ media, onClose, publicView = false }) {
   const navigate = useNavigate();
   const [currentQuality, setCurrentQuality] = useState("original");
-  const token = localStorage.getItem("token");
+  const token = publicView ? null : localStorage.getItem("token");
+  const canShare = !publicView && media?.access === "public";
 
   const mediaUrl = useMemo(() => {
     if (!media) return "";
-    if (currentQuality === "original") {
-      return media.url.startsWith("http")
-        ? media.url
-        : `${MEDIA_URL}${media.url}`;
-    }
-    const variant = media.variants?.find((v) => v.name === currentQuality);
-    if (variant) {
-      return variant.url.startsWith("http")
-        ? variant.url
-        : `${MEDIA_URL}${variant.url}`;
-    }
-    return media.url.startsWith("http")
-      ? media.url
-      : `${MEDIA_URL}${media.url}`;
-  }, [currentQuality, media]);
+    return mediaService.serve(String(media._id), {
+      variant: currentQuality === "original" ? undefined : currentQuality,
+      token: token || undefined,
+    });
+  }, [currentQuality, media, token]);
 
   useEffect(() => {
     const onKeyDown = (evt) => {
@@ -126,18 +116,22 @@ export default function ImagePlayer({ media, onClose }) {
               >
                 Download
               </a>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(
-                    `/image?id=${encodeURIComponent(String(media._id))}`,
-                  );
-                }}
-                className="inline-flex items-center justify-center rounded-lg bg-white/10 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/20"
-              >
-                Share Link
-              </button>
+              {canShare ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(getSharePath(media._id));
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg bg-white/10 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/20"
+                >
+                  Share Link
+                </button>
+              ) : !publicView ? (
+                <span className="inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/50">
+                  Make public to share
+                </span>
+              ) : null}
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { optionalAuthenticate } from '../middleware/auth.middleware.js';
 import {
   getMasterPlaylist,
   getQualityPlaylist,
@@ -12,18 +12,18 @@ import {
 
 const router = Router();
 
-router.get('/:id/master.m3u8', authenticate, getMasterPlaylist);
+router.get('/:id/master.m3u8', optionalAuthenticate, getMasterPlaylist);
 
-router.get('/:id/:quality.m3u8', authenticate, getQualityPlaylist);
+router.get('/:id/:quality.m3u8', optionalAuthenticate, getQualityPlaylist);
 
-router.get('/:id/:quality/:segment', authenticate, getSegment);
+router.get('/:id/:quality/:segment', optionalAuthenticate, getSegment);
 
-router.get('/:id/thumbnail', getVideoThumbnail);
+router.get('/:id/thumbnail', optionalAuthenticate, getVideoThumbnail);
 
-router.get('/:id/scrub.jpg', getScrubSprite);
+router.get('/:id/scrub.jpg', optionalAuthenticate, getScrubSprite);
 
-router.get('/:id/status', authenticate, getStreamStatus);
+router.get('/:id/status', optionalAuthenticate, getStreamStatus);
 
-router.get('/:id/qualities', authenticate, getAvailableQualities);
+router.get('/:id/qualities', optionalAuthenticate, getAvailableQualities);
 
 export default router;

@@ -378,7 +378,7 @@ Response:
     size: Number,
     format: String
   }],
-  access: String,        // Enum: ['public', 'private'], default: 'public'
+  access: String,        // Enum: ['public', 'private'], default: 'private'
   user: ObjectId,         // Reference to User (owner)
   
   // Indexes for performance:

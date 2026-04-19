@@ -2,6 +2,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import Media from '../models/Media.js';
+import { canAccessMedia, denyMediaAccess } from '../utils/mediaAccess.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,8 +22,8 @@ export async function getMasterPlaylist(req, res) {
       return res.status(400).json({ success: false, message: 'Not a video file' });
     }
 
-    if (media.access === 'private' && !req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     if (!media.hls || !media.hls.masterPlaylist) {
@@ -61,8 +62,8 @@ export async function getQualityPlaylist(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (media.access === 'private' && !req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     if (!media.hls?.qualities) {
@@ -106,8 +107,8 @@ export async function getSegment(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (media.access === 'private' && !req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     const segmentPath = path.join(HLS_BASE_DIR, id.toString(), quality, `${segment}.ts`);
@@ -130,6 +131,10 @@ export async function getVideoThumbnail(req, res) {
       return res.status(404).json({ success: false, message: 'Thumbnail not found' });
     }
 
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
+    }
+
     const thumbPath = path.join(HLS_BASE_DIR, media.hls.thumbnailPath);
     res.setHeader('Content-Type', 'image/jpeg');
     res.sendFile(thumbPath);
@@ -145,6 +150,10 @@ export async function getScrubSprite(req, res) {
 
     if (!media || !media.hls?.scrubSpritePath) {
       return res.status(404).json({ success: false, message: 'Scrub sprite not found' });
+    }
+
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     const spritePath = path.join(HLS_BASE_DIR, media.hls.scrubSpritePath);
@@ -163,6 +172,10 @@ export async function getStreamStatus(req, res) {
 
     if (!media) {
       return res.status(404).json({ success: false, message: 'Media not found' });
+    }
+
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     const scrubDoc = media.hls?.scrub;
@@ -201,6 +214,10 @@ export async function getAvailableQualities(req, res) {
 
     if (!media) {
       return res.status(404).json({ success: false, message: 'Media not found' });
+    }
+
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     if (!media.hls?.qualities) {

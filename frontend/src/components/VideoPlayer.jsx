@@ -1,26 +1,26 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Hls from "hls.js";
-import api, { mediaService } from "../services/api";
+import api, { mediaService, publicApi } from "../services/api";
+import { getSharePath } from "../utils/share";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || "http://localhost:5000";
 
 export default function VideoPlayer({
   media,
   onClose,
   directPlayback = false,
+  publicView = false,
 }) {
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
-  const token = localStorage.getItem("token");
+  const token = publicView ? null : localStorage.getItem("token");
   const navigate = useNavigate();
 
   const [qualities, setQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [streamStatus, setStreamStatus] = useState(null);
   const [useFallback, setUseFallback] = useState(!!directPlayback);
 
@@ -38,41 +38,27 @@ export default function VideoPlayer({
   const [scrubPreviewTime, setScrubPreviewTime] = useState(0);
   const [scrubTooltipVisible, setScrubTooltipVisible] = useState(false);
 
-  // Guard: ensure media and media.url exist
-  if (!media || !media.url) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white gap-4 p-6">
-        <p className="text-center text-gray-300">
-          Unable to load video. Media data is incomplete.
-        </p>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-medium transition-colors"
-          >
-            Close
-          </button>
-        )}
-      </div>
-    );
-  }
-
-  const fallbackUrl = media.url.startsWith("http")
-    ? media.url
-    : `${MEDIA_URL}${media.url}`;
-
-  const isDirectPlaybackLink = String(media._id) === "direct-playback";
+  const mediaId = media?._id ? String(media._id) : null;
+  const isDirectPlaybackLink = mediaId === "direct-playback";
+  const fallbackUrl = isDirectPlaybackLink
+    ? media?.url || ""
+    : mediaId
+      ? mediaService.serve(mediaId, { token: token || undefined })
+      : "";
+  const canShare =
+    !publicView && !isDirectPlaybackLink && media?.access === "public";
 
   const downloadHref = useMemo(() => {
     if (isDirectPlaybackLink) return fallbackUrl;
     const t = token || undefined;
-    return mediaService.serve(String(media._id), { download: true, token: t });
-  }, [media._id, fallbackUrl, token, isDirectPlaybackLink]);
+    if (!mediaId) return "";
+    return mediaService.serve(mediaId, { download: true, token: t });
+  }, [mediaId, fallbackUrl, token, isDirectPlaybackLink]);
 
   const [directDownloadPending, setDirectDownloadPending] = useState(false);
 
   const handleDirectPlaybackDownload = useCallback(async () => {
-    const name = media.originalName || "video.mp4";
+    const name = media?.originalName || "video.mp4";
     setDirectDownloadPending(true);
     try {
       const res = await fetch(fallbackUrl, { mode: "cors" });
@@ -90,7 +76,7 @@ export default function VideoPlayer({
     } finally {
       setDirectDownloadPending(false);
     }
-  }, [fallbackUrl, media.originalName]);
+  }, [fallbackUrl, media?.originalName]);
 
   const controlsTimeoutRef = useRef(null);
   const scrubSeekingRef = useRef(false);
@@ -102,10 +88,10 @@ export default function VideoPlayer({
   }, [streamStatus]);
 
   const scrubImageUrl = useMemo(() => {
-    if (!scrubInfo) return null;
+    if (!scrubInfo || !mediaId) return null;
     const q = token ? `?token=${token}` : "";
-    return `${API_URL}/streaming/${media._id}/scrub.jpg${q}`;
-  }, [scrubInfo, media._id, token]);
+    return `${API_URL}/streaming/${mediaId}/scrub.jpg${q}`;
+  }, [scrubInfo, mediaId, token]);
 
   useEffect(() => {
     if (!scrubImageUrl) return;
@@ -126,10 +112,11 @@ export default function VideoPlayer({
   }, []);
 
   useEffect(() => {
-    if (directPlayback) return;
+    if (directPlayback || !mediaId) return;
     const fetchStreamStatus = async () => {
       try {
-        const res = await api.get(`/streaming/${media._id}/status`);
+        const client = publicView ? publicApi : api;
+        const res = await client.get(`/streaming/${mediaId}/status`);
         const data = res.data;
         if (data.success && data.data) {
           setStreamStatus(data.data);
@@ -142,7 +129,7 @@ export default function VideoPlayer({
       }
     };
     fetchStreamStatus();
-  }, [media._id, directPlayback]);
+  }, [mediaId, directPlayback, publicView]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -153,17 +140,19 @@ export default function VideoPlayer({
       return;
     }
 
+    if (!mediaId) return;
+
     if (hlsRef.current) {
       hlsRef.current.destroy();
     }
 
-    const hlsUrl = `${API_URL}/streaming/${media._id}/master.m3u8${token ? `?token=${token}` : ""}`;
+    const hlsUrl = `${API_URL}/streaming/${mediaId}/master.m3u8${token ? `?token=${token}` : ""}`;
 
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        xhrSetup: (xhr, url) => {
+        xhrSetup: (xhr) => {
           if (token) {
             xhr.setRequestHeader("Authorization", `Bearer ${token}`);
           }
@@ -205,7 +194,7 @@ export default function VideoPlayer({
         hlsRef.current.destroy();
       }
     };
-  }, [media._id, token, directPlayback]);
+  }, [mediaId, token, directPlayback]);
 
   // Video Event Listeners
   useEffect(() => {
@@ -500,6 +489,24 @@ export default function VideoPlayer({
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
+  if (!media) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white gap-4 p-6">
+        <p className="text-center text-gray-300">
+          Unable to load video. Media data is incomplete.
+        </p>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-medium transition-colors"
+          >
+            Close
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-0 sm:p-8"
@@ -550,18 +557,12 @@ export default function VideoPlayer({
             </div>
           )}
 
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-              <p className="text-red-400">{error}</p>
-            </div>
-          )}
-
           <video
             ref={videoRef}
             className="w-full h-full object-contain cursor-pointer"
             poster={
               streamStatus?.hasHls
-                ? `${API_URL}/streaming/${media._id}/thumbnail`
+                ? `${API_URL}/streaming/${mediaId}/thumbnail${token ? `?token=${token}` : ""}`
                 : undefined
             }
             onClick={togglePlay}
@@ -869,17 +870,21 @@ export default function VideoPlayer({
 
                 <div className="flex flex-col gap-3 sm:items-end">
                   <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigate(
-                          `/watch?src=${encodeURIComponent(fallbackUrl)}`,
-                        );
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-                    >
-                      <span>Share</span>
-                    </button>
+                    {canShare ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigate(getSharePath(mediaId));
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                      >
+                        <span>Share</span>
+                      </button>
+                    ) : !publicView && !isDirectPlaybackLink ? (
+                      <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/50">
+                        Make public to share
+                      </span>
+                    ) : null}
                     {isDirectPlaybackLink ? (
                       <button
                         type="button"

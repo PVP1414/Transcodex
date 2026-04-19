@@ -1,8 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import morgan from 'morgan';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
@@ -10,9 +8,6 @@ import mediaRoutes from './routes/media.routes.js';
 import streamingRoutes from './routes/streaming.routes.js';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const logger = (req, res, next) => {
   const timestamp = new Date().toISOString();
@@ -30,8 +25,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 app.use(logger);
-
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);

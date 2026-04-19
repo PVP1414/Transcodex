@@ -3,19 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { mediaService } from "../services/api";
 import { useToast } from "../context/ToastContext";
 
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function MediaCard({ media, onDelete }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [deleting, setDeleting] = useState(false);
   const [changingAccess, setChangingAccess] = useState(false);
+  const token = localStorage.getItem("token");
   const isVideo = media.mediaType === "video";
   const isImage = media.mediaType === "image";
+  const hasThumbnail = !isVideo || Boolean(media.thumbnail?.path);
 
-  const thumbnailUrl = media.thumbnail?.url
-    ? `${MEDIA_URL}${media.thumbnail.url}`
-    : `${MEDIA_URL}${media.url}`;
+  const thumbnailUrl = hasThumbnail
+    ? isVideo
+      ? `${API_URL}/streaming/${media._id}/thumbnail${token ? `?token=${token}` : ""}`
+      : mediaService.serve(String(media._id), {
+          thumbnail: Boolean(media.thumbnail?.path),
+          variant: media.thumbnail?.path ? undefined : "small",
+          token: token || undefined,
+        })
+    : null;
 
   const handleDelete = async (e) => {
     e.stopPropagation();
@@ -59,12 +67,18 @@ export default function MediaCard({ media, onDelete }) {
       onClick={() => navigate(`/resource?id=${media._id}`)}
     >
       <div className="relative aspect-video bg-gray-900 overflow-hidden group-hover:rounded-none transition-all">
-        <img
-          src={thumbnailUrl}
-          alt={media.originalName}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={media.originalName}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-800 text-gray-300">
+            <span className="text-sm font-medium">Processing preview…</span>
+          </div>
+        )}
 
         {(isVideo || isImage) && (
           <div className="absolute right-2 bottom-2 bg-black/80 px-2 py-1 rounded text-white text-xs font-semibold backdrop-blur-sm shadow-sm z-10 flex items-center gap-1">

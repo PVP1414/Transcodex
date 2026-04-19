@@ -2,6 +2,13 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+export const publicApi = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -49,12 +56,13 @@ export const mediaService = {
   /**
    * Absolute URL for GET /media/:id/serve (use in img src or anchor; no axios auth).
    * @param {string} id
-   * @param {string | { variant?: string, download?: boolean, token?: string }} [options] variant name or options object
+   * @param {string | { variant?: string, thumbnail?: boolean, download?: boolean, token?: string }} [options] variant name or options object
    */
   serve: (id, options) => {
     const opts = typeof options === 'string' ? { variant: options } : (options || {});
     const params = new URLSearchParams();
     if (opts.variant) params.set('variant', opts.variant);
+    if (opts.thumbnail) params.set('thumbnail', '1');
     if (opts.download) params.set('download', '1');
     if (opts.token) params.set('token', opts.token);
     const qs = params.toString();

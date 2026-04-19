@@ -8,9 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/UploadPage";
 import GalleryPage from "./pages/GalleryPage";
 import PublicGalleryPage from "./pages/PublicGalleryPage";
-import WatchPage from "./pages/WatchPage";
-import ImageViewPage from "./pages/ImageViewPage";
 import ResourcePage from "./pages/ResourcePage";
+import SharePage from "./pages/SharePage";
 import Docs from "./pages/Docs";
 
 function App() {
@@ -22,8 +21,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/public-gallery" element={<PublicGalleryPage />} />
-            <Route path="/watch" element={<WatchPage />} />
-            <Route path="/image" element={<ImageViewPage />} />
+            <Route path="/share/:id" element={<SharePage />} />
 
             <Route element={<ProtectedRoute withLayout={false} />}>
               <Route path="/resource" element={<ResourcePage />} />

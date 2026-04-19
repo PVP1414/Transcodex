@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import Media from "../models/Media.js";
 import { getStorageAdapter } from "../services/storage/index.js";
 import videoTranscoder from "../services/video/Transcoder.js";
+import { canAccessMedia, denyMediaAccess } from "../utils/mediaAccess.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,7 +85,7 @@ export async function uploadMedia(req, res) {
       thumbnail,
       dimensions,
       variants,
-      access: req.body.access || "public",
+      access: req.body.access || "private",
       user: req.user.id,
       hls: { status: "processing" }, // processing for both image and video
     });
@@ -373,14 +374,8 @@ export async function getMediaInfo(req, res) {
         .json({ success: false, message: "Media not found" });
     }
 
-    if (media.access === "private") {
-      const uid = req.user?.id?.toString?.() ?? req.user?.id;
-      const owner = media.user?.toString?.() ?? media.user;
-      if (!uid || uid !== owner) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Authentication required" });
-      }
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     res.json({
@@ -495,6 +490,33 @@ function safeDownloadFilename(name) {
   return base;
 }
 
+function getContentTypeForPath(filePath, fallbackType) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case ".webp":
+      return "image/webp";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".gif":
+      return "image/gif";
+    case ".svg":
+      return "image/svg+xml";
+    case ".mp4":
+      return "video/mp4";
+    case ".webm":
+      return "video/webm";
+    case ".mov":
+      return "video/quicktime";
+    case ".avi":
+      return "video/x-msvideo";
+    default:
+      return fallbackType;
+  }
+}
+
 export async function serveMedia(req, res) {
   try {
     const media = await Media.findById(req.params.id);
@@ -505,26 +527,23 @@ export async function serveMedia(req, res) {
         .json({ success: false, message: "Media not found" });
     }
 
-    if (media.access === "private") {
-      const uid = req.user?.id?.toString?.() ?? req.user?.id;
-      const owner = media.user?.toString?.() ?? media.user;
-      if (!uid || uid !== owner) {
-        return res
-          .status(401)
-          .json({ success: false, message: "Authentication required" });
-      }
+    if (!canAccessMedia(media, req.user)) {
+      return denyMediaAccess(res);
     }
 
     const storage = getStorageAdapter();
     const variant = req.query.variant;
+    const thumbnail = req.query.thumbnail === "1" || req.query.thumbnail === "true";
 
     let filePath = media.path;
-    if (variant && media.variants) {
+    if (thumbnail && media.thumbnail?.path) {
+      filePath = media.thumbnail.path;
+    } else if (variant && media.variants) {
       const found = media.variants.find((v) => v.name === variant);
       if (found) filePath = found.path;
     }
 
-    res.setHeader("Content-Type", media.mimeType);
+    res.setHeader("Content-Type", getContentTypeForPath(filePath, media.mimeType));
     res.setHeader("Cache-Control", "public, max-age=31536000");
 
     const forceDownload =

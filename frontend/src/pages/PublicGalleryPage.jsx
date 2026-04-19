@@ -1,22 +1,21 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { mediaService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
-import MediaPreview from '../components/MediaPreview';
+import { getSharePath } from '../utils/share';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
 export default function PublicGalleryPage() {
   const { user } = useAuth();
-  const [selectedMedia, setSelectedMedia] = useState(null);
+  const navigate = useNavigate();
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [filter, setFilter] = useState({ type: '' });
 
-  const fetchMedia = async (page = 1) => {
+  const fetchMedia = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = { page, limit: 20 };
@@ -30,11 +29,11 @@ export default function PublicGalleryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter.type]);
 
   useEffect(() => {
     fetchMedia();
-  }, [filter]);
+  }, [fetchMedia]);
 
   const handlePageChange = (newPage) => {
     fetchMedia(newPage);
@@ -122,18 +121,22 @@ export default function PublicGalleryPage() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {media.map(item => {
-                const hasThumb = !!item.thumbnail?.url;
-                const imgSrc = hasThumb 
-                  ? `${MEDIA_URL}${item.thumbnail.url}` 
-                  : `${API_URL}/media/${item._id}/serve`;
+                const hasThumb = item.mediaType === 'image' || Boolean(item.thumbnail?.path);
+                const imgSrc =
+                  item.mediaType === 'video'
+                    ? `${API_URL}/streaming/${item._id}/thumbnail`
+                    : mediaService.serve(String(item._id), {
+                        thumbnail: Boolean(item.thumbnail?.path),
+                        variant: item.thumbnail?.path ? undefined : 'small',
+                      });
 
                 return (
                 <div
                   key={item._id}
                   className="group relative aspect-square bg-gray-100 rounded-xl overflow-hidden cursor-pointer"
-                  onClick={() => setSelectedMedia(item)}
+                  onClick={() => navigate(getSharePath(item._id))}
                 >
-                  {item.mediaType === 'image' || hasThumb ? (
+                  {hasThumb ? (
                     <img
                       src={imgSrc}
                       alt={item.originalName}
@@ -181,13 +184,6 @@ export default function PublicGalleryPage() {
                   Next
                 </button>
               </div>
-            )}
-
-            {selectedMedia && (
-              <MediaPreview 
-                media={selectedMedia} 
-                onClose={() => setSelectedMedia(null)} 
-              />
             )}
           </>
         )}
