@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VideoPlayer from './VideoPlayer';
+import { mediaService } from '../services/api';
 
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
 
@@ -8,6 +9,7 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
   const [media, setMedia] = useState(initialMedia);
   const [currentQuality, setCurrentQuality] = useState('original');
   const navigate = useNavigate();
+  const token = localStorage.getItem('token');
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.key === 'Escape') onClose();
@@ -117,9 +119,10 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
           )}
           
           <div className="flex gap-3 mt-4">
-            <a 
-              href={mediaUrl} 
-              download={media.originalName}
+            <a
+              href={mediaService.serve(String(media._id), { download: true, token: token || undefined })}
+              target="_blank"
+              rel="noreferrer"
               className="inline-block px-6 py-2 bg-indigo-500 text-white font-medium rounded-lg hover:bg-indigo-600 transition-colors"
             >
               Download
@@ -127,7 +130,7 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
             <button
               type="button"
               onClick={() => {
-                navigate(`/image?src=${encodeURIComponent(getDisplayUrl())}`);
+                navigate(`/image?id=${encodeURIComponent(String(media._id))}`);
               }}
               className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
             >

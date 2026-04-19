@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
-import api from '../services/api';
+import api, { mediaService } from '../services/api';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:5000';
@@ -35,6 +35,38 @@ export default function VideoPlayer({ media, onClose, directPlayback = false }) 
   const [scrubTooltipVisible, setScrubTooltipVisible] = useState(false);
 
   const fallbackUrl = media.url.startsWith('http') ? media.url : `${MEDIA_URL}${media.url}`;
+
+  const isDirectPlaybackLink = String(media._id) === 'direct-playback';
+
+  const downloadHref = useMemo(() => {
+    if (isDirectPlaybackLink) return fallbackUrl;
+    const t = token || undefined;
+    return mediaService.serve(String(media._id), { download: true, token: t });
+  }, [media._id, fallbackUrl, token, isDirectPlaybackLink]);
+
+  const [directDownloadPending, setDirectDownloadPending] = useState(false);
+
+  const handleDirectPlaybackDownload = useCallback(async () => {
+    const name = media.originalName || 'video.mp4';
+    setDirectDownloadPending(true);
+    try {
+      const res = await fetch(fallbackUrl, { mode: 'cors' });
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = name;
+      a.rel = 'noopener';
+      a.click();
+      URL.revokeObjectURL(href);
+    } catch {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      setDirectDownloadPending(false);
+    }
+  }, [fallbackUrl, media.originalName]);
+
   const controlsTimeoutRef = useRef(null);
   const scrubSeekingRef = useRef(false);
 
@@ -586,14 +618,27 @@ export default function VideoPlayer({ media, onClose, directPlayback = false }) 
                   <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                   <span className="hidden sm:inline">Share</span>
                 </button>
-                <a 
-                  href={media.url}
-                  download={media.originalName}
-                  className="p-2 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center gap-2"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  <span className="hidden sm:inline">Download</span>
-                </a>
+                {isDirectPlaybackLink ? (
+                  <button
+                    type="button"
+                    disabled={directDownloadPending}
+                    onClick={handleDirectPlaybackDownload}
+                    className="p-2 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 disabled:opacity-60 transition-colors text-sm flex items-center gap-2"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span className="hidden sm:inline">{directDownloadPending ? 'Preparing…' : 'Download'}</span>
+                  </button>
+                ) : (
+                  <a
+                    href={downloadHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 sm:px-4 sm:py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors text-sm flex items-center gap-2"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span className="hidden sm:inline">Download</span>
+                  </a>
+                )}
               </div>
             </h3>
 

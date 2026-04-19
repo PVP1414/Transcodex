@@ -43,9 +43,23 @@ export const mediaService = {
   list: (params) => api.get('/media', { params }),
   listPublic: (params) => api.get('/media/public', { params }),
   getById: (id) => api.get(`/media/${id}`),
+  getInfo: (id) => api.get(`/media/${id}/info`),
   update: (id, data) => api.put(`/media/${id}`, data),
   delete: (id) => api.delete(`/media/${id}`),
-  serve: (id, variant) => `${API_URL}/media/${id}/serve${variant ? `?variant=${variant}` : ''}`,
+  /**
+   * Absolute URL for GET /media/:id/serve (use in img src or anchor; no axios auth).
+   * @param {string} id
+   * @param {string | { variant?: string, download?: boolean, token?: string }} [options] variant name or options object
+   */
+  serve: (id, options) => {
+    const opts = typeof options === 'string' ? { variant: options } : (options || {});
+    const params = new URLSearchParams();
+    if (opts.variant) params.set('variant', opts.variant);
+    if (opts.download) params.set('download', '1');
+    if (opts.token) params.set('token', opts.token);
+    const qs = params.toString();
+    return `${API_URL}/media/${id}/serve${qs ? `?${qs}` : ''}`;
+  },
 };
 
 export default api;

@@ -304,6 +304,37 @@ export async function listPublicMedia(req, res) {
   }
 }
 
+/** Public metadata for share/embed views; private requires owner JWT (optionalAuthenticate). */
+export async function getMediaInfo(req, res) {
+  try {
+    const media = await Media.findById(req.params.id);
+
+    if (!media) {
+      return res.status(404).json({ success: false, message: 'Media not found' });
+    }
+
+    if (media.access === 'private') {
+      const uid = req.user?.id?.toString?.() ?? req.user?.id;
+      const owner = media.user?.toString?.() ?? media.user;
+      if (!uid || uid !== owner) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        _id: media._id,
+        originalName: media.originalName,
+        mediaType: media.mediaType,
+        access: media.access,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
 export async function getMediaById(req, res) {
   try {
     const media = await Media.findOne({ _id: req.params.id, user: req.user.id });
@@ -373,6 +404,11 @@ export async function updateMedia(req, res) {
   }
 }
 
+function safeDownloadFilename(name) {
+  const base = String(name || 'download').replace(/[\r\n"]/g, '_').trim() || 'download';
+  return base;
+}
+
 export async function serveMedia(req, res) {
   try {
     const media = await Media.findById(req.params.id);
@@ -381,13 +417,17 @@ export async function serveMedia(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (media.access === 'private' && !req.user) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
+    if (media.access === 'private') {
+      const uid = req.user?.id?.toString?.() ?? req.user?.id;
+      const owner = media.user?.toString?.() ?? media.user;
+      if (!uid || uid !== owner) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
     }
 
     const storage = getStorageAdapter();
     const variant = req.query.variant;
-    
+
     let filePath = media.path;
     if (variant && media.variants) {
       const found = media.variants.find(v => v.name === variant);
@@ -396,6 +436,13 @@ export async function serveMedia(req, res) {
 
     res.setHeader('Content-Type', media.mimeType);
     res.setHeader('Cache-Control', 'public, max-age=31536000');
+
+    const forceDownload = req.query.download === '1' || req.query.download === 'true';
+    if (forceDownload) {
+      const filename = safeDownloadFilename(media.originalName);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    }
+
     await storage.serve(filePath, res);
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
