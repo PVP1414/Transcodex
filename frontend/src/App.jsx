@@ -25,11 +25,14 @@ function App() {
             <Route path="/watch" element={<WatchPage />} />
             <Route path="/image" element={<ImageViewPage />} />
 
+            <Route element={<ProtectedRoute withLayout={false} />}>
+              <Route path="/resource" element={<ResourcePage />} />
+            </Route>
+
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/upload" element={<UploadPage />} />
               <Route path="/gallery" element={<GalleryPage />} />
-              <Route path="/resource" element={<ResourcePage />} />
               <Route path="/docs" element={<Docs />} />
             </Route>
 
