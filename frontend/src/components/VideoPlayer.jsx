@@ -516,7 +516,7 @@ export default function VideoPlayer({
     >
       {/* Video Overlay wrapper */}
       <div
-        className={`relative bg-black w-full max-w-6xl mx-auto flex flex-col ${isFullscreen ? "h-full max-w-none" : "rounded-xl overflow-hidden shadow-2xl max-h-[100dvh] sm:max-h-[90vh]"}`}
+        className={`relative bg-black w-full max-w-6xl mx-auto flex flex-col ${isFullscreen ? "h-full max-w-none" : "rounded-xl overflow-hidden shadow-2xl max-h-dvh sm:max-h-[90vh]"}`}
       >
         {/* Top Control Bar */}
         <div className="absolute inset-x-0 top-0 z-20 bg-black/60 backdrop-blur-sm border-b border-white/10 px-4 py-3 flex items-center justify-between gap-3">
@@ -547,7 +547,7 @@ export default function VideoPlayer({
         {/* Video Player Area */}
         <div
           ref={containerRef}
-          className="relative group w-full flex-1 flex-shrink min-h-0 flex items-center justify-center bg-black overflow-hidden"
+          className="relative group w-full flex-1 shrink min-h-0 flex items-center justify-center bg-black overflow-hidden"
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isPlaying && setShowControls(false)}
         >
@@ -615,13 +615,13 @@ export default function VideoPlayer({
 
           {/* Custom Controls Bar */}
           <div
-            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col pb-2 px-4 transition-opacity duration-300 z-10 ${scrubInfo ? "pt-24 sm:pt-28" : "pt-12"} ${showControls || !isPlaying ? "opacity-100" : "opacity-0"}`}
+            className={`absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/90 via-black/50 to-transparent flex flex-col pb-2 px-4 transition-opacity duration-300 z-10 ${scrubInfo ? "pt-24 sm:pt-28" : "pt-12"} ${showControls || !isPlaying ? "opacity-100" : "opacity-0"}`}
           >
             {/* Timeline Slider */}
             <div className="w-full relative mb-3 group/slider cursor-pointer pt-1">
               {scrubInfo && scrubTooltipVisible && duration > 0 && (
                 <div
-                  className="absolute pointer-events-none z-[4] flex flex-col items-center gap-1"
+                  className="absolute pointer-events-none z-4 flex flex-col items-center gap-1"
                   style={{
                     left: `${(scrubPreviewTime / duration) * 100}%`,
                     bottom: "calc(100% + 10px)",

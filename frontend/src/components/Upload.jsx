@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { mediaService } from '../services/api';
 
 export default function Upload({ onUploadComplete }) {
@@ -9,6 +9,7 @@ export default function Upload({ onUploadComplete }) {
   const [phaseStartTime, setPhaseStartTime] = useState(null);
   const [phaseProgress, setPhaseProgress] = useState(0);
   const [error, setError] = useState('');
+  const [elapsedMs, setElapsedMs] = useState(0);
   const fileInputRef = useRef(null);
 
   const handleDragOver = (e) => {
@@ -36,9 +37,21 @@ export default function Upload({ onUploadComplete }) {
     }
   };
 
-  const getEtaString = () => {
+  useEffect(() => {
+    if (!uploading || !phaseStartTime || progress === 100) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setElapsedMs(Date.now() - phaseStartTime);
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [uploading, phaseStartTime, progress]);
+
+  const etaString = useMemo(() => {
     if (!phaseStartTime || phaseProgress === 0 || progress === 100) return '';
-    const elapsed = (Date.now() - phaseStartTime) / 1000;
+    const elapsed = elapsedMs / 1000;
     const totalEst = elapsed / (phaseProgress / 100);
     const remaining = totalEst - elapsed;
     
@@ -50,7 +63,7 @@ export default function Upload({ onUploadComplete }) {
       return `~${mins}m ${secs}s left`;
     }
     return `~${Math.floor(remaining)}s left`;
-  };
+  }, [elapsedMs, phaseProgress, phaseStartTime, progress]);
 
   const uploadFile = async (file) => {
     setError('');
@@ -59,6 +72,7 @@ export default function Upload({ onUploadComplete }) {
     setUploadPhase('uploading');
     setPhaseStartTime(Date.now());
     setPhaseProgress(0);
+    setElapsedMs(0);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -79,6 +93,7 @@ export default function Upload({ onUploadComplete }) {
         setUploadPhase(isVideo ? 'transcoding' : 'optimizing');
         setPhaseStartTime(Date.now());
         setPhaseProgress(0);
+        setElapsedMs(0);
 
         const intervalId = setInterval(async () => {
           try {
@@ -97,7 +112,7 @@ export default function Upload({ onUploadComplete }) {
                if (onUploadComplete) onUploadComplete(statusMedia);
                setTimeout(() => setUploading(false), 500);
             }
-          } catch(err) {
+          } catch {
              clearInterval(intervalId);
              setUploading(false);
           }
@@ -169,11 +184,11 @@ export default function Upload({ onUploadComplete }) {
               </span>
             </div>
             <p className="mt-4 text-gray-700 font-medium tracking-wide">
-              {uploadPhase === 'transcoding' ? 'Transcoding media...' : uploadPhase === 'optimizing' ? 'Optimizing image...' : 'Uploading file...'}
+                {uploadPhase === 'transcoding' ? 'Transcoding media...' : uploadPhase === 'optimizing' ? 'Optimizing image...' : 'Uploading file...'}
             </p>
             {progress > 0 && progress < 100 && (
               <p className="mt-1 text-sm text-gray-500 animate-pulse min-h-[20px]">
-                {getEtaString()}
+                {etaString}
               </p>
             )}
           </div>

@@ -1,9 +1,6 @@
-import { useState } from "react";
 import MediaGallery from "../components/MediaGallery";
 
 export default function GalleryPage() {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
   return (
     <>
       <div className="mb-6">
@@ -14,7 +11,7 @@ export default function GalleryPage() {
       </div>
 
       <div className="bg-white rounded-xl p-6 border border-gray-100">
-        <MediaGallery refreshTrigger={refreshTrigger} />
+        <MediaGallery refreshTrigger={0} />
       </div>
     </>
   );

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import Upload from '../components/Upload';
-import { useToast } from '../context/ToastContext';
-import { mediaService } from '../services/api';
+import { useToast } from '../context/toast';
 
 export default function UploadPage() {
   const toast = useToast();
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [, setRefreshTrigger] = useState(0);
 
   const handleUploadComplete = (media) => {
     setRefreshTrigger(n => n + 1);

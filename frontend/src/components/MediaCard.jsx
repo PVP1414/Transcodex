@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { mediaService } from "../services/api";
-import { useToast } from "../context/ToastContext";
+import { useToast } from "../context/toast";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 

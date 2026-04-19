@@ -42,26 +42,6 @@ export default function ResourcePage() {
     navigate("/gallery");
   };
 
-  // Utility: format file size
-  const formatSize = (bytes) => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  };
-
-  // Utility: get dimensions or duration
-  const formatDimensions = () => {
-    if (media.mediaType === "video" && media.duration) {
-      const mins = Math.floor(media.duration / 60);
-      const secs = Math.floor(media.duration % 60);
-      return `${mins}:${secs.toString().padStart(2, "0")}`;
-    }
-    if (media.dimensions) {
-      return `${media.dimensions.width} × ${media.dimensions.height}`;
-    }
-    return "N/A";
-  };
-
   // Loading state
   if (loading) {
     return (

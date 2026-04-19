@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { mediaService } from "../services/api";
 import MediaCard from "./MediaCard";
 import { MediaGallerySkeleton } from "./Skeleton";
@@ -9,7 +9,7 @@ export default function MediaGallery({ refreshTrigger }) {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [filter, setFilter] = useState({ type: "", access: "" });
 
-  const fetchMedia = async (page = 1) => {
+  const fetchMedia = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params = { page, limit: 20 };
@@ -24,11 +24,11 @@ export default function MediaGallery({ refreshTrigger }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter.access, filter.type]);
 
   useEffect(() => {
     fetchMedia();
-  }, [refreshTrigger, filter]);
+  }, [fetchMedia, refreshTrigger]);
 
   const handleDelete = (id, updated = false) => {
     if (updated) {

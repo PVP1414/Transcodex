@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
+import { useAuth } from '../context/auth';
+import { useToast } from '../context/toast';
 import Upload from '../components/Upload';
 import MediaGallery from '../components/MediaGallery';
 import MediaPreview from '../components/MediaPreview';
 import Stats from '../components/Stats';
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const toast = useToast();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [selectedMedia, setSelectedMedia] = useState(null);

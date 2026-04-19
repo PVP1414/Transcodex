@@ -60,7 +60,7 @@ function SectionParagraph({ children }) {
   return <p className="text-gray-600 leading-relaxed mb-4">{children}</p>;
 }
 
-function CodeBlock({ children, language = 'bash' }) {
+function CodeBlock({ children }) {
   return (
     <div className="bg-gray-900 rounded-lg p-4 my-4 overflow-x-auto">
       <code className="text-sm text-gray-100 font-mono">{children}</code>
