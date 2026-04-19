@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import MediaGallery from '../components/MediaGallery';
-import MediaPreview from '../components/MediaPreview';
+import { useState } from "react";
+import MediaGallery from "../components/MediaGallery";
 
 export default function GalleryPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [selectedMedia, setSelectedMedia] = useState(null);
 
   return (
     <>
@@ -16,18 +14,8 @@ export default function GalleryPage() {
       </div>
 
       <div className="bg-white rounded-xl p-6 border border-gray-100">
-        <MediaGallery
-          refreshTrigger={refreshTrigger}
-          onMediaClick={setSelectedMedia}
-        />
+        <MediaGallery refreshTrigger={refreshTrigger} />
       </div>
-
-      {selectedMedia && (
-        <MediaPreview
-          media={selectedMedia}
-          onClose={() => setSelectedMedia(null)}
-        />
-      )}
     </>
   );
 }
