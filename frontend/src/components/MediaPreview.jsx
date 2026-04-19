@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import VideoPlayer from './VideoPlayer';
 import { mediaService } from '../services/api';
-import { getSharePath } from '../utils/share';
+import { useToast } from '../context/toast';
+import { copyShareUrl, getSharePath } from '../utils/share';
 
 export default function MediaPreview({ media: initialMedia, onClose }) {
   const [media] = useState(initialMedia);
   const [currentQuality, setCurrentQuality] = useState('original');
   const navigate = useNavigate();
+  const toast = useToast();
   const token = localStorage.getItem('token');
   const canShare = media?.access === 'public';
   useEffect(() => {
@@ -28,6 +30,16 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
       variant: currentQuality === 'original' ? undefined : currentQuality,
       token: token || undefined,
     });
+  };
+
+  const handleShare = async () => {
+    try {
+      await copyShareUrl(media._id);
+      toast.success('Public share link copied');
+    } catch {
+      toast.error('Failed to copy share link');
+    }
+    navigate(getSharePath(media._id));
   };
 
   const formatSize = (bytes) => {
@@ -122,9 +134,7 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
             {canShare ? (
               <button
                 type="button"
-                onClick={() => {
-                  navigate(getSharePath(media._id));
-                }}
+                onClick={handleShare}
                 className="inline-block px-6 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 transition-colors"
               >
                 Share link

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { mediaService } from "../services/api";
-import { getSharePath } from "../utils/share";
+import { useToast } from "../context/toast";
+import { copyShareUrl, getSharePath } from "../utils/share";
 
 export default function ImagePlayer({ media, onClose, publicView = false }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const [currentQuality, setCurrentQuality] = useState("original");
   const token = publicView ? null : localStorage.getItem("token");
   const canShare = !publicView && media?.access === "public";
@@ -26,6 +28,17 @@ export default function ImagePlayer({ media, onClose, publicView = false }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
+
+  const handleShare = async (event) => {
+    event.stopPropagation();
+    try {
+      await copyShareUrl(media._id);
+      toast.success("Public share link copied");
+    } catch {
+      toast.error("Failed to copy share link");
+    }
+    navigate(getSharePath(media._id));
+  };
 
   if (!media) {
     return null;
@@ -119,10 +132,7 @@ export default function ImagePlayer({ media, onClose, publicView = false }) {
               {canShare ? (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(getSharePath(media._id));
-                  }}
+                  onClick={handleShare}
                   className="inline-flex items-center justify-center rounded-lg bg-white/10 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/20"
                 >
                   Share Link

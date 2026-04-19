@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Hls from "hls.js";
 import api, { mediaService, publicApi } from "../services/api";
-import { getSharePath } from "../utils/share";
+import { useToast } from "../context/toast";
+import { copyShareUrl, getSharePath } from "../utils/share";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -17,6 +18,7 @@ export default function VideoPlayer({
   const hlsRef = useRef(null);
   const token = publicView ? null : localStorage.getItem("token");
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [qualities, setQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
@@ -77,6 +79,17 @@ export default function VideoPlayer({
       setDirectDownloadPending(false);
     }
   }, [fallbackUrl, media?.originalName]);
+
+  const handleShare = useCallback(async () => {
+    if (!mediaId) return;
+    try {
+      await copyShareUrl(mediaId);
+      toast.success("Public share link copied");
+    } catch {
+      toast.error("Failed to copy share link");
+    }
+    navigate(getSharePath(mediaId));
+  }, [mediaId, navigate, toast]);
 
   const controlsTimeoutRef = useRef(null);
   const scrubSeekingRef = useRef(false);
@@ -873,9 +886,7 @@ export default function VideoPlayer({
                     {canShare ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          navigate(getSharePath(mediaId));
-                        }}
+                        onClick={handleShare}
                         className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
                       >
                         <span>Share</span>
