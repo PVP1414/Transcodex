@@ -1,9 +1,11 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { validateApiKey } from '../services/signedUrl.js';
 
 export const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const apiKeyHeader = req.headers['x-api-key'] || req.query.apiKey;
     let token;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -12,8 +14,17 @@ export const authenticate = async (req, res, next) => {
       token = req.query.token;
     }
 
-    if (!token) {
+    if (!token && !apiKeyHeader) {
       return res.status(401).json({ success: false, message: 'No token provided' });
+    }
+
+    if (apiKeyHeader) {
+      const apiKeyDoc = await validateApiKey(apiKeyHeader);
+      if (!apiKeyDoc) {
+        return res.status(401).json({ success: false, message: 'Invalid API key' });
+      }
+      req.apiKey = apiKeyDoc;
+      return next();
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
@@ -34,12 +45,21 @@ export const authenticate = async (req, res, next) => {
 export const optionalAuthenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    const apiKeyHeader = req.headers['x-api-key'] || req.query.apiKey;
     let token;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.split(' ')[1];
     } else if (req.query.token) {
       token = req.query.token;
+    }
+
+    if (apiKeyHeader) {
+      const apiKeyDoc = await validateApiKey(apiKeyHeader);
+      if (apiKeyDoc) {
+        req.apiKey = apiKeyDoc;
+      }
+      return next();
     }
 
     if (!token) {

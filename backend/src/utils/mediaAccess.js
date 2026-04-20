@@ -1,6 +1,8 @@
-export function canAccessMedia(media, user) {
+export function canAccessMedia(media, user, apiKey) {
   if (!media) return false;
   if (media.access === "public") return true;
+
+  if (apiKey) return true;
 
   const userId = user?.id?.toString?.() ?? user?.id;
   const ownerId = media.user?.toString?.() ?? media.user;

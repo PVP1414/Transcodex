@@ -374,7 +374,7 @@ export async function getMediaInfo(req, res) {
         .json({ success: false, message: "Media not found" });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -527,7 +527,7 @@ export async function serveMedia(req, res) {
         .json({ success: false, message: "Media not found" });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 

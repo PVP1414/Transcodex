@@ -6,6 +6,8 @@ import connectDB from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import mediaRoutes from './routes/media.routes.js';
 import streamingRoutes from './routes/streaming.routes.js';
+import apiKeyRoutes from './routes/apiKey.routes.js';
+import signedRoutes from './routes/signed.routes.js';
 
 dotenv.config();
 
@@ -29,6 +31,8 @@ app.use(logger);
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/streaming', streamingRoutes);
+app.use('/api/keys', apiKeyRoutes);
+app.use('/api/signed', signedRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

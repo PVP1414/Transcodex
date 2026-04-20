@@ -22,7 +22,7 @@ export async function getMasterPlaylist(req, res) {
       return res.status(400).json({ success: false, message: 'Not a video file' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -62,7 +62,7 @@ export async function getQualityPlaylist(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -107,7 +107,7 @@ export async function getSegment(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -131,7 +131,7 @@ export async function getVideoThumbnail(req, res) {
       return res.status(404).json({ success: false, message: 'Thumbnail not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -152,7 +152,7 @@ export async function getScrubSprite(req, res) {
       return res.status(404).json({ success: false, message: 'Scrub sprite not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -174,7 +174,7 @@ export async function getStreamStatus(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
@@ -216,7 +216,7 @@ export async function getAvailableQualities(req, res) {
       return res.status(404).json({ success: false, message: 'Media not found' });
     }
 
-    if (!canAccessMedia(media, req.user)) {
+    if (!canAccessMedia(media, req.user, req.apiKey)) {
       return denyMediaAccess(res);
     }
 
