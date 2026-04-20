@@ -13,6 +13,8 @@ export default function Layout({ children }) {
       case '/gallery': return 'Gallery';
       case '/docs': return 'Documentation';
       case '/public-gallery': return 'Public Gallery';
+      case '/api-keys': return 'API Keys';
+      case '/access': return 'Access Resource';
       default: return 'MediaHub';
     }
   };

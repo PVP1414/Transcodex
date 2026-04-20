@@ -131,7 +131,7 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
             >
               Download
             </a>
-            {canShare ? (
+            {canShare && (
               <button
                 type="button"
                 onClick={handleShare}
@@ -139,10 +139,6 @@ export default function MediaPreview({ media: initialMedia, onClose }) {
               >
                 Share link
               </button>
-            ) : (
-              <span className="inline-block px-6 py-2 bg-gray-200 text-gray-500 font-medium rounded-lg">
-                Make public to share
-              </span>
             )}
           </div>
         </div>

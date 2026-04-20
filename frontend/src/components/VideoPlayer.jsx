@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Hls from "hls.js";
-import api, { mediaService, publicApi } from "../services/api";
+import api, { mediaService } from "../services/api";
 import { useToast } from "../context/toast";
 import { copyShareUrl, getSharePath } from "../utils/share";
 
@@ -12,6 +12,7 @@ export default function VideoPlayer({
   onClose,
   directPlayback = false,
   publicView = false,
+  apiKey = null,
 }) {
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -19,6 +20,12 @@ export default function VideoPlayer({
   const token = publicView ? null : localStorage.getItem("token");
   const navigate = useNavigate();
   const toast = useToast();
+
+  const authHeader = apiKey 
+    ? { 'x-api-key': apiKey }
+    : token 
+      ? { Authorization: `Bearer ${token}` }
+      : {};
 
   const [qualities, setQualities] = useState([]);
   const [currentQuality, setCurrentQuality] = useState(-1);
@@ -91,6 +98,16 @@ export default function VideoPlayer({
     navigate(getSharePath(mediaId));
   }, [mediaId, navigate, toast]);
 
+  const handleCopyId = useCallback(async () => {
+    if (!mediaId) return;
+    try {
+      await navigator.clipboard.writeText(mediaId);
+      toast.success("Media ID copied");
+    } catch {
+      toast.error("Failed to copy ID");
+    }
+  }, [mediaId, toast]);
+
   const controlsTimeoutRef = useRef(null);
   const scrubSeekingRef = useRef(false);
 
@@ -102,9 +119,9 @@ export default function VideoPlayer({
 
   const scrubImageUrl = useMemo(() => {
     if (!scrubInfo || !mediaId) return null;
-    const q = token ? `?token=${token}` : "";
+    const q = apiKey ? `?apiKey=${apiKey}` : (token ? `?token=${token}` : "");
     return `${API_URL}/streaming/${mediaId}/scrub.jpg${q}`;
-  }, [scrubInfo, mediaId, token]);
+  }, [scrubInfo, mediaId, token, apiKey]);
 
   useEffect(() => {
     if (!scrubImageUrl) return;
@@ -128,8 +145,7 @@ export default function VideoPlayer({
     if (directPlayback || !mediaId) return;
     const fetchStreamStatus = async () => {
       try {
-        const client = publicView ? publicApi : api;
-        const res = await client.get(`/streaming/${mediaId}/status`);
+        const res = await api.get(`/streaming/${mediaId}/status`, { headers: authHeader });
         const data = res.data;
         if (data.success && data.data) {
           setStreamStatus(data.data);
@@ -142,7 +158,7 @@ export default function VideoPlayer({
       }
     };
     fetchStreamStatus();
-  }, [mediaId, directPlayback, publicView]);
+  }, [mediaId, directPlayback, authHeader]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -159,14 +175,18 @@ export default function VideoPlayer({
       hlsRef.current.destroy();
     }
 
-    const hlsUrl = `${API_URL}/streaming/${mediaId}/master.m3u8${token ? `?token=${token}` : ""}`;
+    const hlsUrl = apiKey 
+      ? `${API_URL}/streaming/${mediaId}/master.m3u8?apiKey=${apiKey}`
+      : `${API_URL}/streaming/${mediaId}/master.m3u8${token ? `?token=${token}` : ""}`;
 
     if (Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
         xhrSetup: (xhr) => {
-          if (token) {
+          if (apiKey) {
+            xhr.setRequestHeader("x-api-key", apiKey);
+          } else if (token) {
             xhr.setRequestHeader("Authorization", `Bearer ${token}`);
           }
         },
@@ -207,7 +227,7 @@ export default function VideoPlayer({
         hlsRef.current.destroy();
       }
     };
-  }, [mediaId, token, directPlayback]);
+  }, [mediaId, token, directPlayback, apiKey]);
 
   // Video Event Listeners
   useEffect(() => {
@@ -556,6 +576,18 @@ export default function VideoPlayer({
             <span className="font-medium capitalize">{media.mediaType}</span>
             <span>{formatSize(media.size)}</span>
           </div>
+          <button
+            type="button"
+            onClick={handleCopyId}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/10"
+            title="Copy ID"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+            </svg>
+            Copy ID
+          </button>
         </div>
         {/* Video Player Area */}
         <div
@@ -575,7 +607,7 @@ export default function VideoPlayer({
             className="w-full h-full object-contain cursor-pointer"
             poster={
               streamStatus?.hasHls
-                ? `${API_URL}/streaming/${mediaId}/thumbnail${token ? `?token=${token}` : ""}`
+                ? `${API_URL}/streaming/${mediaId}/thumbnail${apiKey ? `?apiKey=${apiKey}` : (token ? `?token=${token}` : "")}`
                 : undefined
             }
             onClick={togglePlay}
@@ -832,14 +864,6 @@ export default function VideoPlayer({
                     <h3 className="text-xl sm:text-2xl font-semibold break-all">
                       {media.originalName}
                     </h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-white/60">
-                        {media.mediaType}
-                      </span>
-                      <span className="text-sm text-white/60">
-                        {formatSize(media.size)}
-                      </span>
-                    </div>
                   </div>
                   {streamStatus && (
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-gray-300">
@@ -891,10 +915,6 @@ export default function VideoPlayer({
                       >
                         <span>Share</span>
                       </button>
-                    ) : !publicView && !isDirectPlaybackLink ? (
-                      <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/50">
-                        Make public to share
-                      </span>
                     ) : null}
                     {isDirectPlaybackLink ? (
                       <button
