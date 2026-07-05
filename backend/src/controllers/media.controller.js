@@ -24,6 +24,7 @@ const ALLOWED_VIDEO_TYPES = [
   "video/x-msvideo",
 ];
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const ENABLE_SCRUB_SPRITE = process.env.ENABLE_SCRUB_SPRITE === "true";
 
 export async function uploadMedia(req, res) {
   console.log("[MEDIA] Upload called");
@@ -173,7 +174,12 @@ export async function uploadMedia(req, res) {
 
           let scrubSpritePath;
           let scrub;
-          if (durationSec && Number.isFinite(durationSec) && durationSec > 0) {
+          if (
+            ENABLE_SCRUB_SPRITE &&
+            durationSec &&
+            Number.isFinite(durationSec) &&
+            durationSec > 0
+          ) {
             const scrubResult = await videoTranscoder.generateScrubSprite(
               uploadedFilePath,
               media._id.toString(),
@@ -206,6 +212,7 @@ export async function uploadMedia(req, res) {
         } catch (transcodeError) {
           console.error("[MEDIA] HLS transcoding failed:", transcodeError);
           media.hls.status = "failed";
+          media.transcodingProgress = 0;
           await media.save();
         } finally {
           await fs.unlink(file.path).catch(() => {});

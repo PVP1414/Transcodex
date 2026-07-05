@@ -1,4 +1,6 @@
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 import path from 'path';
 import fs from 'fs/promises';
 import os from 'os';
@@ -19,6 +21,18 @@ const HLS_QUALITIES = [
   { name: '720p', width: 1280, height: 720, bitrate: '2800k' },
   { name: '1080p', width: 1920, height: 1080, bitrate: '5000k' },
 ];
+
+const DEFAULT_HLS_RENDITIONS = 1;
+
+function positiveIntegerFromEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const HLS_SEGMENT_SECONDS = positiveIntegerFromEnv('HLS_SEGMENT_SECONDS', 20);
+
+ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH || ffmpegInstaller.path);
+ffmpeg.setFfprobePath(process.env.FFPROBE_PATH || ffprobeInstaller.path);
 
 export class VideoTranscoder {
   constructor() {
@@ -71,22 +85,47 @@ export class VideoTranscoder {
     const outputDir = path.join(this.outputDir, mediaId.toString());
     await this.ensureDir(outputDir);
 
-    const tasks = HLS_QUALITIES.map((quality, index) => 
-      this.transcodeQuality(inputPath, outputDir, quality, mediaId, index === HLS_QUALITIES.length - 1 ? onProgress : null)
-    );
+    const metadata = await this.getVideoMetadata(inputPath);
+    const qualities = this.selectQualities(metadata);
 
-    await Promise.all(tasks);
+    if (!qualities.length) {
+      throw new Error('No HLS qualities selected for this video');
+    }
 
-    await this.createMasterPlaylist(outputDir, mediaId);
+    for (let index = 0; index < qualities.length; index += 1) {
+      const quality = qualities[index];
+      await this.transcodeQuality(inputPath, outputDir, quality, mediaId, (percent) => {
+        if (!onProgress) return;
+        const qualityShare = 80 / qualities.length;
+        const totalProgress = 10 + (index * qualityShare) + ((percent / 100) * qualityShare);
+        onProgress(Math.min(90, Math.round(totalProgress)));
+      });
+    }
+
+    await this.createMasterPlaylist(outputDir, qualities);
+    if (onProgress) await onProgress(92);
     await this.uploadDirectory(outputDir, `videos/${mediaId}`);
+    if (onProgress) await onProgress(95);
 
     return {
       masterPlaylist: `${mediaId}/playlist.m3u8`,
-      qualities: HLS_QUALITIES.map(q => ({
+      qualities: qualities.map(q => ({
         name: q.name,
         playlist: `${mediaId}/${q.name}.m3u8`
       }))
     };
+  }
+
+  selectQualities(metadata) {
+    const inputHeight = Number(metadata?.height);
+    const maxRenditions = positiveIntegerFromEnv('HLS_MAX_RENDITIONS', DEFAULT_HLS_RENDITIONS);
+
+    const eligible = Number.isFinite(inputHeight) && inputHeight > 0
+      ? HLS_QUALITIES.filter((quality) => quality.height <= inputHeight)
+      : [HLS_QUALITIES[0]];
+
+    const selected = eligible.length ? eligible : [HLS_QUALITIES[0]];
+    return selected.slice(0, maxRenditions);
   }
 
   async transcodeQuality(inputPath, outputDir, quality, mediaId, onProgress) {
@@ -101,7 +140,9 @@ export class VideoTranscoder {
           `-b:a 128k`,
           '-c:v libx264',
           '-c:a aac',
-          '-hls_time 10',
+          '-preset veryfast',
+          '-threads 1',
+          `-hls_time ${HLS_SEGMENT_SECONDS}`,
           '-hls_playlist_type vod',
           `-hls_segment_filename ${qualityDir}/segment%d.ts`,
           '-start_number 1'
@@ -118,18 +159,18 @@ export class VideoTranscoder {
         })
         .on('error', (err) => {
           console.error(`[TRANSCODE] ${quality.name} failed:`, err.message);
-          resolve();
+          reject(err);
         })
         .run();
     });
   }
 
-  async createMasterPlaylist(outputDir, mediaId) {
+  async createMasterPlaylist(outputDir, qualities) {
     const lines = ['#EXTM3U', '#EXT-X-VERSION:3'];
     
-    for (const quality of HLS_QUALITIES) {
+    for (const quality of qualities) {
       const bandwidth = parseInt(quality.bitrate) * 1000;
-      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${quality.width}x${Math.floor(quality.width * 9/16)}`);
+      lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${quality.width}x${quality.height}`);
       lines.push(`${quality.name}.m3u8`);
     }
 
