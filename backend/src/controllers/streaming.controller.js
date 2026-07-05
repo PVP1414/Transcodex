@@ -1,13 +1,14 @@
-import path from 'path';
-import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
 import Media from '../models/Media.js';
 import { canAccessMedia, denyMediaAccess } from '../utils/mediaAccess.js';
+import { getStorageAdapter } from '../services/storage/index.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const HLS_BASE_DIR = path.join(__dirname, '../../uploads/videos');
+function buildAccessQuery(req) {
+  const params = new URLSearchParams();
+  if (req.query.token) params.set('token', req.query.token);
+  if (req.query.apiKey) params.set('apiKey', req.query.apiKey);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
 
 export async function getMasterPlaylist(req, res) {
   try {
@@ -30,16 +31,16 @@ export async function getMasterPlaylist(req, res) {
       return res.status(404).json({ success: false, message: 'HLS not available yet' });
     }
 
-    const playlistPath = path.join(HLS_BASE_DIR, media.hls.masterPlaylist);
-    const content = await fs.readFile(playlistPath, 'utf-8');
+    const storage = getStorageAdapter();
+    const content = await storage.readText(`videos/${media.hls.masterPlaylist}`);
 
     const baseUrl = `/api/streaming/${id}/`;
-    const tokenQuery = req.query.token ? `?token=${req.query.token}` : '';
+    const accessQuery = buildAccessQuery(req);
     
     const modifiedContent = content
       .split('\n')
       .map(line => {
-        if (line.endsWith('.m3u8') || line.endsWith('.ts')) return baseUrl + line + tokenQuery;
+        if (line.endsWith('.m3u8') || line.endsWith('.ts')) return baseUrl + line + accessQuery;
         return line;
       })
       .join('\n');
@@ -75,16 +76,16 @@ export async function getQualityPlaylist(req, res) {
       return res.status(404).json({ success: false, message: 'Quality not found' });
     }
 
-    const playlistPath = path.join(HLS_BASE_DIR, qualityData.playlist);
-    const content = await fs.readFile(playlistPath, 'utf-8');
+    const storage = getStorageAdapter();
+    const content = await storage.readText(`videos/${qualityData.playlist}`);
 
     const baseUrl = `/api/streaming/${id}/${quality}/`;
-    const tokenQuery = req.query.token ? `?token=${req.query.token}` : '';
+    const accessQuery = buildAccessQuery(req);
     
     const modifiedContent = content
       .split('\n')
       .map(line => {
-        if (line.endsWith('.ts')) return baseUrl + line.replace('.ts', '') + tokenQuery;
+        if (line.endsWith('.ts')) return baseUrl + line.replace('.ts', '') + accessQuery;
         return line;
       })
       .join('\n');
@@ -111,11 +112,12 @@ export async function getSegment(req, res) {
       return denyMediaAccess(res);
     }
 
-    const segmentPath = path.join(HLS_BASE_DIR, id.toString(), quality, `${segment}.ts`);
+    const segmentPath = `videos/${id}/${quality}/${segment}.ts`;
+    const storage = getStorageAdapter();
     
     res.setHeader('Content-Type', 'video/mp2t');
     res.setHeader('Cache-Control', 'public, max-age=31536000');
-    res.sendFile(segmentPath);
+    await storage.serve(segmentPath, res);
   } catch (error) {
     console.error('[STREAM] Error serving segment:', error);
     res.status(404).json({ success: false, message: 'Segment not found' });
@@ -135,9 +137,10 @@ export async function getVideoThumbnail(req, res) {
       return denyMediaAccess(res);
     }
 
-    const thumbPath = path.join(HLS_BASE_DIR, media.hls.thumbnailPath);
+    const thumbPath = `videos/${media.hls.thumbnailPath}`;
+    const storage = getStorageAdapter();
     res.setHeader('Content-Type', 'image/jpeg');
-    res.sendFile(thumbPath);
+    await storage.serve(thumbPath, res);
   } catch (error) {
     res.status(404).json({ success: false, message: 'Thumbnail not found' });
   }
@@ -156,10 +159,11 @@ export async function getScrubSprite(req, res) {
       return denyMediaAccess(res);
     }
 
-    const spritePath = path.join(HLS_BASE_DIR, media.hls.scrubSpritePath);
+    const spritePath = `videos/${media.hls.scrubSpritePath}`;
+    const storage = getStorageAdapter();
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Cache-Control', 'public, max-age=31536000');
-    res.sendFile(spritePath);
+    await storage.serve(spritePath, res);
   } catch (error) {
     res.status(404).json({ success: false, message: 'Scrub sprite not found' });
   }

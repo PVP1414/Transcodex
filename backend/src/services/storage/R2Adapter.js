@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import StorageInterface from "./StorageInterface.js";
 
@@ -66,7 +67,9 @@ class R2Adapter extends StorageInterface {
     );
 
     try {
-      await fs.unlink(file.path);
+      if (!options.keepLocal) {
+        await fs.unlink(file.path);
+      }
     } catch {
       // Ignore cleanup errors for temp uploads.
     }
@@ -76,6 +79,28 @@ class R2Adapter extends StorageInterface {
       url: this.getUrl(key),
       size: file.size,
       mimetype: file.mimetype,
+    };
+  }
+
+  async uploadFile(localPath, remotePath, options = {}) {
+    const key = this.normalizeKey(remotePath);
+    const fileBuffer = await fs.readFile(localPath);
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: fileBuffer,
+        ContentType: options.mimetype || "application/octet-stream",
+      }),
+    );
+
+    const stats = await fs.stat(localPath);
+    return {
+      path: key,
+      url: this.getUrl(key),
+      size: stats.size,
+      mimetype: options.mimetype,
     };
   }
 
@@ -94,6 +119,31 @@ class R2Adapter extends StorageInterface {
       }
       throw error;
     }
+  }
+
+  async deletePrefix(prefix) {
+    const normalizedPrefix = this.normalizeKey(prefix).replace(/\/?$/, "/");
+    let continuationToken;
+
+    do {
+      const list = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: normalizedPrefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      for (const item of list.Contents || []) {
+        if (item.Key) {
+          await this.delete(item.Key);
+        }
+      }
+
+      continuationToken = list.NextContinuationToken;
+    } while (continuationToken);
+
+    return true;
   }
 
   getUrl(relativePath) {
@@ -139,6 +189,22 @@ class R2Adapter extends StorageInterface {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     res.end(Buffer.concat(chunks));
+  }
+
+  async read(relativePath) {
+    const key = this.normalizeKey(relativePath);
+    const response = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+
+    const chunks = [];
+    for await (const chunk of response.Body || []) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 
   async exists(relativePath) {

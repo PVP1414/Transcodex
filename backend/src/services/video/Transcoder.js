@@ -30,6 +30,43 @@ export class VideoTranscoder {
     await fs.mkdir(dirPath, { recursive: true });
   }
 
+  getContentType(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    switch (ext) {
+      case '.m3u8':
+        return 'application/vnd.apple.mpegurl';
+      case '.ts':
+        return 'video/mp2t';
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.webp':
+        return 'image/webp';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  async uploadDirectory(localDir, remotePrefix) {
+    const entries = await fs.readdir(localDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const localPath = path.join(localDir, entry.name);
+      const remotePath = `${remotePrefix}/${entry.name}`.replace(/\\/g, '/');
+
+      if (entry.isDirectory()) {
+        await this.uploadDirectory(localPath, remotePath);
+        continue;
+      }
+
+      if (entry.isFile()) {
+        await this.storage.uploadFile(localPath, remotePath, {
+          mimetype: this.getContentType(localPath),
+        });
+      }
+    }
+  }
+
   async transcodeToHLS(inputPath, mediaId, onProgress) {
     const outputDir = path.join(this.outputDir, mediaId.toString());
     await this.ensureDir(outputDir);
@@ -41,6 +78,7 @@ export class VideoTranscoder {
     await Promise.all(tasks);
 
     await this.createMasterPlaylist(outputDir, mediaId);
+    await this.uploadDirectory(outputDir, `videos/${mediaId}`);
 
     return {
       masterPlaylist: `${mediaId}/playlist.m3u8`,
@@ -113,7 +151,12 @@ export class VideoTranscoder {
         .output(thumbnailPath)
         .on('end', () => {
           console.log('[TRANSCODE] Thumbnail generated');
-          resolve(`${mediaId}/thumbnails/thumb.jpg`);
+          this.storage
+            .uploadFile(thumbnailPath, `videos/${mediaId}/thumbnails/thumb.jpg`, {
+              mimetype: 'image/jpeg',
+            })
+            .then(() => resolve(`${mediaId}/thumbnails/thumb.jpg`))
+            .catch((err) => reject(err));
         })
         .on('error', (err) => {
           console.error('[TRANSCODE] Thumbnail failed:', err.message);
@@ -189,6 +232,10 @@ export class VideoTranscoder {
           .run();
       });
 
+      await this.storage.uploadFile(scrubPath, `videos/${mediaId}/thumbnails/scrub.jpg`, {
+        mimetype: 'image/jpeg',
+      });
+
       console.log('[TRANSCODE] Scrub sprite generated:', totalFrames, 'cells', cols, 'x', rows);
       return {
         relativePath: `${mediaId}/thumbnails/scrub.jpg`,
@@ -213,6 +260,7 @@ export class VideoTranscoder {
   async deleteHLSFiles(mediaId) {
     const outputDir = path.join(this.outputDir, mediaId.toString());
     try {
+      await this.storage.deletePrefix(`videos/${mediaId}`);
       await fs.rm(outputDir, { recursive: true, force: true });
     } catch (err) {
       console.error('[TRANSCODE] Cleanup failed:', err.message);

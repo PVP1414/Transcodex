@@ -70,7 +70,7 @@ export async function uploadMedia(req, res) {
     let variants = [];
 
     console.log("[MEDIA] Uploading to storage...");
-    const uploadResult = await storage.upload(file, { folder });
+    const uploadResult = await storage.upload(file, { folder, keepLocal: true });
     console.log("[MEDIA] Uploaded to:", uploadResult.path);
 
     console.log("[MEDIA] Creating database record...");
@@ -96,11 +96,7 @@ export async function uploadMedia(req, res) {
     if (isImage) {
       (async () => {
         try {
-          const uploadedFilePath = path.join(
-            __dirname,
-            "../../uploads/",
-            uploadResult.path,
-          );
+          const uploadedFilePath = file.path;
           console.log(
             "[MEDIA] Starting async image processing for:",
             uploadedFilePath,
@@ -147,11 +143,7 @@ export async function uploadMedia(req, res) {
       console.log("[MEDIA] Starting HLS transcoding...");
       (async () => {
         try {
-          const uploadedFilePath = path.join(
-            __dirname,
-            "../../uploads/",
-            uploadResult.path,
-          );
+          const uploadedFilePath = file.path;
           console.log("[MEDIA] Transcoding from:", uploadedFilePath);
 
           const hlsResult = await videoTranscoder.transcodeToHLS(
@@ -250,6 +242,9 @@ async function createThumbnail(filePath, originalName, mediaId) {
 
   const relativePath = `images/${mediaId}/thumbnails/${thumbName}`;
   const storage = getStorageAdapter();
+  await storage.uploadFile(thumbPath, relativePath, {
+    mimetype: "image/webp",
+  });
 
   return { path: relativePath, url: storage.getUrl(relativePath) };
 }
@@ -284,6 +279,9 @@ async function createImageVariants(filePath, originalName, mediaId) {
       const meta = await sharp(variantPath).metadata();
       const relativePath = `images/${mediaId}/variants/${variantName}`;
       const storage = getStorageAdapter();
+      await storage.uploadFile(variantPath, relativePath, {
+        mimetype: "image/webp",
+      });
 
       variants.push({
         name: variant.name,

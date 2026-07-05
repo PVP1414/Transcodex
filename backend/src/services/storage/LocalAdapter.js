@@ -19,13 +19,15 @@ class LocalAdapter extends StorageInterface {
   }
 
   async upload(file, options = {}) {
-    const { folder = 'misc', filename } = options;
+    const { folder = 'misc', filename, keepLocal = false } = options;
     const dirPath = await this.ensureDir(folder);
     const destFilename = filename || `${Date.now()}-${file.originalname}`;
     const destPath = path.join(dirPath, destFilename);
 
     await fs.copyFile(file.path, destPath);
-    await fs.unlink(file.path);
+    if (!keepLocal) {
+      await fs.unlink(file.path);
+    }
 
     const relativePath = path.join(folder, destFilename).replace(/\\/g, '/');
     return {
@@ -33,6 +35,24 @@ class LocalAdapter extends StorageInterface {
       url: relativePath,
       size: file.size,
       mimetype: file.mimetype,
+    };
+  }
+
+  async uploadFile(localPath, remotePath, options = {}) {
+    const normalizedPath = remotePath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const destPath = path.join(this.basePath, normalizedPath);
+    await fs.mkdir(path.dirname(destPath), { recursive: true });
+
+    if (path.resolve(localPath) !== path.resolve(destPath)) {
+      await fs.copyFile(localPath, destPath);
+    }
+
+    const stats = await fs.stat(destPath);
+    return {
+      path: normalizedPath,
+      url: this.getUrl(normalizedPath),
+      size: stats.size,
+      mimetype: options.mimetype,
     };
   }
 
@@ -47,8 +67,19 @@ class LocalAdapter extends StorageInterface {
     }
   }
 
+  async deletePrefix(prefix) {
+    const fullPath = path.join(this.basePath, prefix);
+    await fs.rm(fullPath, { recursive: true, force: true });
+    return true;
+  }
+
   getUrl(relativePath) {
     return `/uploads/${relativePath.replace(/\\/g, '/')}`;
+  }
+
+  async read(relativePath) {
+    const fullPath = path.join(this.basePath, relativePath);
+    return fs.readFile(fullPath);
   }
 
   async serve(relativePath, res) {
