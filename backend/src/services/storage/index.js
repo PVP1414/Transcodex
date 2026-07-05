@@ -1,11 +1,13 @@
-import LocalAdapter from './LocalAdapter.js';
+import LocalAdapter from "./LocalAdapter.js";
+import R2Adapter from "./R2Adapter.js";
 
-const STORAGE_TYPE = process.env.STORAGE_TYPE || 'local';
+const STORAGE_TYPE = process.env.STORAGE_TYPE || "local";
 
 let storageAdapter = null;
 
 const adapters = {
   local: LocalAdapter,
+  s3: R2Adapter,
 };
 
 export function getStorageAdapter() {
